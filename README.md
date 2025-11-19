@@ -52,10 +52,11 @@ Once installed, you can run `aegis-cli` from any terminal with the path to your 
 aegis-cli /path/to/your/aegis-backup.json
 ```
 
-If your vault requires a password, you will be prompted securely. You can also provide the password directly (use with caution in scripts):
+If your vault requires a password, you will be prompted securely. For non-interactive use (e.g., in scripts), you can provide the password via the `AEGIS_CLI_PASSWORD` environment variable:
 
 ```bash
-aegis-cli /path/to/your/aegis-backup.json -p "YourVaultPassword"
+export AEGIS_CLI_PASSWORD="YourVaultPassword"
+aegis-cli /path/to/your/aegis-backup.json
 ```
 
 ## License

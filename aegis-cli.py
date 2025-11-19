@@ -9,7 +9,6 @@ def main():
     parser = argparse.ArgumentParser(description="Aegis Authenticator CLI in Python.")
     parser.add_argument("-v", "--vault-path", help="Path to the Aegis vault file. If not provided, attempts to find the latest in default locations.")
     parser.add_argument("-d", "--vault-dir", help="Directory to search for vault files. Defaults to current directory.", default=".")
-    parser.add_argument("-p", "--password", help="Vault password. If not provided, will prompt securely.")
     parser.add_argument("-u", "--uuid", help="Display OTP for a specific entry UUID.")
     parser.add_argument("positional_vault_path", nargs="?", help="Path to the Aegis vault file (positional argument).", default=None)
 
@@ -28,7 +27,7 @@ def main():
             return
         print(f"Found vault: {vault_path}")
 
-    password = args.password
+    password = os.getenv("AEGIS_CLI_PASSWORD")
     if not password:
         try:
             try:

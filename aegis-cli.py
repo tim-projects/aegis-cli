@@ -83,10 +83,19 @@ def main():
                 max_group_len = 0
                 max_note_len = 0
 
+                # Create a mapping of group UUIDs to group names
+                group_names = {group.uuid: group.name for group in vault_data.db.groups}
+
                 for entry in vault_data.db.entries:
                     name = entry.name
                     issuer = entry.issuer if entry.issuer else ""
-                    groups = ", ".join(entry.groups) if entry.groups else ""
+                    
+                    # Resolve group UUIDs to names
+                    resolved_groups = []
+                    for group_uuid in entry.groups:
+                        resolved_groups.append(group_names.get(group_uuid, group_uuid)) # Fallback to UUID if name not found
+                    groups = ", ".join(resolved_groups) if resolved_groups else ""
+
                     note = entry.note if entry.note else ""
                     uuid = entry.uuid
 

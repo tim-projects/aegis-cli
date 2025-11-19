@@ -206,25 +206,26 @@ def main():
                         print(apply_color(line, COLOR_DIM, args.no_color))
                 
                 # Only prompt for input if there's more than one item or if the single item isn't already revealed
-                                if len(display_data) > 1 or (len(display_data) == 1 and display_data[0]["uuid"] not in revealed_otps):
-                                    prompt_text = "\nMake a selection to reveal the OTP code (or press Ctrl+C to exit): "
-                                    print(apply_color(prompt_text, COLOR_DIM, args.no_color), end='')
-                                    try:
-                                        selection = input()
-                                        if selection.isdigit():
-                                            selected_index = int(selection)
-                                            # Clear previously revealed OTPs and add the new one
-                                            revealed_otps.clear()
-                                            for item in display_data:
-                                                if item["index"] == selected_index:
-                                                    revealed_otps.add(item["uuid"])
-                                                    break
-                                    except KeyboardInterrupt:
-                                        raise # Re-raise to be caught by the outer KeyboardInterrupt handler
-                                    except EOFError: # Handle cases where input stream might close (e.g., non-interactive shell)
-                                        print(apply_color("\nNon-interactive session detected. Exiting.", COLOR_DIM, args.no_color))
-                                        os.system('clear')
-                                        return                else:
+                # Only prompt for input if there's more than one item or if the single item isn't already revealed
+                if len(display_data) > 1 or (len(display_data) == 1 and display_data[0]["uuid"] not in revealed_otps):
+                    prompt_text = "\nMake a selection to reveal the OTP code (or press Ctrl+C to exit): "
+                    print(apply_color(prompt_text, COLOR_DIM, args.no_color), end='')
+                    try:
+                        selection = input()
+                        if selection.isdigit():
+                            selected_index = int(selection)
+                            # Clear previously revealed OTPs and add the new one
+                            revealed_otps.clear()
+                            for item in display_data:
+                                if item["index"] == selected_index:
+                                    revealed_otps.add(item["uuid"])
+                                    break
+                    except KeyboardInterrupt:
+                        raise # Re-raise to be caught by the outer KeyboardInterrupt handler
+                    except EOFError: # Handle cases where input stream might close (e.g., non-interactive shell)
+                        print(apply_color("\nNon-interactive session detected. Exiting.", COLOR_DIM, args.no_color))
+                        os.system('clear')
+                        return                else:
                     # If only one item and it's already revealed, just wait for countdown
                     pass
 

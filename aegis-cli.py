@@ -10,7 +10,7 @@ def main():
     parser.add_argument("-v", "--vault-path", help="Path to the Aegis vault file. If not provided, attempts to find the latest in default locations.")
     parser.add_argument("-d", "--vault-dir", help="Directory to search for vault files. Defaults to current directory.", default=".")
     parser.add_argument("-u", "--uuid", help="Display OTP for a specific entry UUID.")
-    parser.add_argument("positional_vault_path", nargs="?", help="Path to the Aegis vault file (positional argument).", default=None)
+    parser.add_argument("positional_vault_path", nargs="?", help="Path to the Aegis vault file.", default=None)
 
     args = parser.parse_args()
 

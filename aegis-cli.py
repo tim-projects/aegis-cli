@@ -119,12 +119,9 @@ def main():
         try:
             revealed_otps = set() # Keep track of which OTPs are revealed
             while True:
-                revealed_otps.clear() # Clear previously revealed OTPs on each refresh
+                # Do not clear revealed_otps here; it should persist until a new selection is made.
                 os.system('clear') # Clear the screen for each refresh
                 print("--- All OTPs ---")
-                
-                # Recalculate OTPs for the current time, as they might change during the countdown
-                otps = get_otps(vault_data)
 
                 # Collect data and calculate max widths
                 display_data = []
@@ -238,7 +235,9 @@ def main():
                     time.sleep(1)
                     os.system('clear') # Clear for next second of countdown
                     print("--- All OTPs ---")
-                    # Re-print header and OTPs (they don't change during the 1-second countdown)
+                    # Recalculate OTPs for the current time, as they might change during the countdown
+                    otps = get_otps(vault_data)
+                    # Re-print header and OTPs
                     print(f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}")
                     print(f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}")
                     for item in display_data:

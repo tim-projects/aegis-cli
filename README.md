@@ -1,8 +1,18 @@
 # aegis-cli
 
-A command-line interface (CLI) tool for viewing Aegis Authenticator Time-based One-Time Passwords (TOTP).
+### Example Output
 
-This project is a complete rewrite in Python, originally inspired by the `avdu` project (https://github.com/Sammy-T/avdu). It provides CLI functionality for displaying OTP codes from an encrypted Aegis vault.
+```
+--- All OTPs ---
+MyBank             (Bank of America)  123456
+MyEmail            (Google)           789012
+MySocial           (Facebook)         345678
+MyGaming           (Steam)            901234
+
+Time until next refresh: 25.0 seconds
+```
+
+A command-line interface (CLI) tool for viewing Aegis Authenticator Time-based One-Time Passwords (TOTP).
 
 **Note:** This tool is primarily a viewer and does not support editing or creating new OTP codes.
 
@@ -13,7 +23,6 @@ This project is a complete rewrite in Python, originally inspired by the `avdu` 
 *   Automatically refreshes OTPs based on their configured periods, with a live countdown.
 *   Outputs OTPs in a clear, sorted table format (by Issuer).
 *   Purely command-line based, with no graphical interface.
-*   Graceful exit on `Ctrl+C` (KeyboardInterrupt), clearing the screen for security.
 
 ## Usage
 
@@ -49,19 +58,8 @@ If your vault requires a password, you will be prompted securely. You can also p
 aegis-cli /path/to/your/aegis-backup.json -p "YourVaultPassword"
 ```
 
-### Example Output
-
-```
---- All OTPs ---
-MyBank             (Bank of America)  123456
-MyEmail            (Google)           789012
-MySocial           (Facebook)         345678
-MyGaming           (Steam)            901234
-
-Time until next refresh: 25.0 seconds
-```
-
-
 ## License
 
 This project is licensed under the GNU General Public License v3.0. See the `LICENSE` file for details.
+
+This project is a complete rewrite in Python, originally inspired by the `avdu` project (https://github.com/Sammy-T/avdu). It provides CLI functionality for displaying OTP codes from an encrypted Aegis vault.

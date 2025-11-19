@@ -9,19 +9,24 @@ license=('GPL3')
 depends=()
 makedepends=('go')
 
-source=("${pkgname}-${pkgver}.tar.gz::https://github.com/tim-projects/${pkgname}/archive/v${pkgver}.tar.gz")
-sha256sums=('SKIP') # IMPORTANT: Replace 'SKIP' with the actual checksum of the release tarball before AUR submission.
-
 build() {
-  cd "${srcdir}/${pkgname}-${pkgver}"
-  go mod tidy
-  go build -o "${pkgname}" ./cmd/aegis-cli/main.go
+  # Change into the source directory where go.mod is located.
+  # This is necessary when BUILDDIR is set externally (e.g., /tmp/makepkg).
+  cd "${srcdir}" 
+
+  # Set Go-specific variables to use the source directory
+  export GOCACHE="${srcdir}/.go_cache"
+  export GOMODCACHE="${srcdir}/.go_mod_cache"
+  export GOPATH="${srcdir}/.go"
+  
+  go mod tidy -v
+  go build -v -modcacherw -o "${srcdir}/${pkgname}" github.com/tim-projects/aegis-cli/cmd/aegis-cli
 }
 
 package() {
   install -d "${pkgdir}/usr/bin"
-  install -m 755 "${srcdir}/${pkgname}-${pkgver}/${pkgname}" "${pkgdir}/usr/bin/"
+  install -m 755 "${srcdir}/${pkgname}" "${pkgdir}/usr/bin/"
 
   install -d "${pkgdir}/usr/share/licenses/${pkgname}"
-  install -m 644 "${srcdir}/${pkgname}-${pkgver}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/"
+  install -m 644 "${srcdir}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/"
 }

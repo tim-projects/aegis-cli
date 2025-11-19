@@ -37,6 +37,7 @@ Time until next refresh: 25.0 seconds
 
 *   Decrypts Aegis Authenticator vault files using a provided password.
 *   Continuously displays OTP codes for all entries in a real-time refreshing table.
+*   Automatically reveals the code if only one OTP entry is displayed.
 *   Interactive mode to type-search and reveal obscured OTP codes on demand.
 *   Supports filtering OTP entries by group name.
 *   Purely command-line based, with no graphical interface.
@@ -81,14 +82,15 @@ aegis-cli /path/to/your/aegis-backup.json --no-color
 
 ## Configuration
 
-`aegis-cli` stores its configuration in `~/.config/aegis/config.json`. This file is automatically created if it doesn't exist. It currently stores the path to the last successfully opened Aegis vault file, allowing `aegis-cli` to quickly reopen it on subsequent runs without requiring the path to be specified again.
+`aegis-cli` stores its configuration in `~/.config/aegis-cli/config.json`. This file is automatically created if it doesn't exist. It currently stores the path to the last successfully opened Aegis vault file, allowing `aegis-cli` to quickly reopen it on subsequent runs without requiring the path to be specified again. It also stores `default_color_mode`, which determines if colored output is enabled by default (true) or disabled (false). This can be overridden by the `--no-color` flag.
 
 Example `config.json`:
 
 ```json
 {
-    "last_opened_vault": "/home/user/.config/aegis/aegis-backup-20251026-200544.json",
-    "last_vault_dir": "/home/user/.config/aegis"
+    "last_opened_vault": "/home/user/.config/aegis-cli/aegis-backup-20251026-200544.json",
+    "last_vault_dir": "/home/user/.config/aegis-cli",
+    "default_color_mode": true
 }
 ```
 

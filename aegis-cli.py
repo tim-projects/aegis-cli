@@ -2,6 +2,8 @@ import argparse
 import getpass
 import os
 import time
+import json
+from pathlib import Path
 
 from aegis_core import find_vault_path, read_and_decrypt_vault_file, get_otps, get_ttn
 
@@ -10,7 +12,27 @@ COLOR_RESET = "\033[0m"
 COLOR_DIM = "\033[2m"
 COLOR_BOLD_WHITE = "\033[1;97m"
 
-DEFAULT_AEGIS_VAULT_DIR = os.path.expanduser("~/.config/aegis")
+DEFAULT_AEGIS_VAULT_DIR = os.path.expanduser("~/.config/aegis-cli")
+CONFIG_FILE_PATH = Path(DEFAULT_AEGIS_VAULT_DIR) / "config.json"
+
+def load_config():
+    if CONFIG_FILE_PATH.exists():
+        try:
+            with open(CONFIG_FILE_PATH, 'r') as f:
+                config = json.load(f)
+                # Provide default values for new config keys if they don't exist
+                if "last_opened_vault" not in config: config["last_opened_vault"] = None
+                if "last_vault_dir" not in config: config["last_vault_dir"] = None
+                if "default_color_mode" not in config: config["default_color_mode"] = True # Default to color enabled
+                return config
+        except json.JSONDecodeError:
+            print(f"Warning: Could not parse config file {CONFIG_FILE_FILE_PATH}. Using default config.")
+    return {"last_opened_vault": None, "last_vault_dir": None, "default_color_mode": True}
+
+def save_config(config):
+    CONFIG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(CONFIG_FILE_PATH, 'w') as f:
+        json.dump(config, f, indent=4)
 
 def apply_color(text, color_code, no_color_flag):
     if no_color_flag:
@@ -28,9 +50,19 @@ def main():
 
     args = parser.parse_args()
 
+    config = load_config()
+    
+    # Override args.no_color if default_color_mode is false and --no-color is not explicitly set
+    if not config["default_color_mode"] and not args.no_color:
+        args.no_color = True
+
     vault_path = args.vault_path
     if not vault_path and args.positional_vault_path and args.positional_vault_path.endswith(".json"):
         vault_path = args.positional_vault_path
+
+    if not vault_path and config["last_opened_vault"]:
+        vault_path = config["last_opened_vault"]
+        print(f"No vault path provided. Opening previously used vault: {vault_path}")
 
     if not vault_path:
         # First, try to find in the explicitly provided or default vault_dir
@@ -65,6 +97,10 @@ def main():
     try:
         vault_data = read_and_decrypt_vault_file(vault_path, password)
         print("Vault decrypted successfully.")
+        # Save the successfully opened vault path to config
+        config["last_opened_vault"] = vault_path
+        config["last_vault_dir"] = os.path.dirname(vault_path)
+        save_config(config)
     except ValueError as e:
         print(f"Error decrypting vault: {e}")
         return
@@ -140,6 +176,10 @@ def main():
                 for i, item in enumerate(display_data):
                     item["index"] = i + 1
 
+                # If only one item, instantly reveal it
+                if len(display_data) == 1:
+                    revealed_otps.add(display_data[0]["uuid"])
+
                 # Print header
                 print(f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}")
                 print(f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}")
@@ -165,23 +205,28 @@ def main():
                         line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
                         print(apply_color(line, COLOR_DIM, args.no_color))
                 
-                # After countdown, prompt for input
-                prompt_text = "\nMake a selection to reveal the OTP code (or press Ctrl+C to exit): "
-                print(apply_color(prompt_text, COLOR_DIM, args.no_color), end='')
-                try:
-                    selection = input()
-                    if selection.isdigit():
-                        selected_index = int(selection)
-                        for item in display_data:
-                            if item["index"] == selected_index:
-                                revealed_otps.add(item["uuid"])
-                                break
-                except KeyboardInterrupt:
-                    raise # Re-raise to be caught by the outer KeyboardInterrupt handler
-                except EOFError: # Handle cases where input stream might close (e.g., non-interactive shell)
-                    print(apply_color("\nNon-interactive session detected. Exiting.", COLOR_DIM, args.no_color))
-                    os.system('clear')
-                    return
+                # Only prompt for input if there's more than one item or if the single item isn't already revealed
+                                if len(display_data) > 1 or (len(display_data) == 1 and display_data[0]["uuid"] not in revealed_otps):
+                                    prompt_text = "\nMake a selection to reveal the OTP code (or press Ctrl+C to exit): "
+                                    print(apply_color(prompt_text, COLOR_DIM, args.no_color), end='')
+                                    try:
+                                        selection = input()
+                                        if selection.isdigit():
+                                            selected_index = int(selection)
+                                            # Clear previously revealed OTPs and add the new one
+                                            revealed_otps.clear()
+                                            for item in display_data:
+                                                if item["index"] == selected_index:
+                                                    revealed_otps.add(item["uuid"])
+                                                    break
+                                    except KeyboardInterrupt:
+                                        raise # Re-raise to be caught by the outer KeyboardInterrupt handler
+                                    except EOFError: # Handle cases where input stream might close (e.g., non-interactive shell)
+                                        print(apply_color("\nNon-interactive session detected. Exiting.", COLOR_DIM, args.no_color))
+                                        os.system('clear')
+                                        return                else:
+                    # If only one item and it's already revealed, just wait for countdown
+                    pass
 
                 ttn = get_ttn()
                 initial_ttn_seconds = int(ttn / 1000)

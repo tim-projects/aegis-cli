@@ -2,9 +2,9 @@
 
 ### Example Output
 
-When run without a group filter, OTP codes are obscured by default:
+When run without a group filter, OTP codes are obscured by default. Other entries are dimmed, and the selected entry is highlighted in bold white when revealed:
 
-```
+```text
 --- All OTPs ---
 #   Issuer             Name               Code    Group              Note
 --- ---                ----               ----    -----              ----
@@ -13,38 +13,38 @@ When run without a group filter, OTP codes are obscured by default:
 3   Google             MyEmail            ******  Personal           Primary Email
 4   Steam              MyGaming           ******  Gaming             Steam Account
 
-Time until next refresh: 25.0 seconds
-
 Make a selection to reveal the OTP code (or press Ctrl+C to exit): 
+
+Time until next refresh: 25.0 seconds
 ```
 
-After entering '1' to reveal the first OTP:
+After entering '1' to reveal the first OTP (note: the output below represents the visual effect, actual ANSI escape codes are not shown):
 
-```
+```text
 --- All OTPs ---
 #   Issuer             Name               Code    Group              Note
 --- ---                ----               ----    -----              ----
-1   Bank of America    MyBank             123456  Finance            Checking Account
-2   Facebook           MySocial           ******  Social             Personal Profile
-3   Google             MyEmail            ******  Personal           Primary Email
-4   Steam              MyGaming           ******  Gaming             Steam Account
-
-Time until next refresh: 25.0 seconds
+1   Bank of America    MyBank             123456  Finance            Checking Account (BOLD WHITE)
+2   Facebook           MySocial           ******  Social             Personal Profile (DIMMED)
+3   Google             MyEmail            ******  Personal           Primary Email (DIMMED)
+4   Steam              MyGaming           ******  Gaming             Steam Account (DIMMED)
 
 Make a selection to reveal the OTP code (or press Ctrl+C to exit): 
+
+Time until next refresh: 25.0 seconds
 ```
 
 When filtering by a specific group (e.g., `aegis-cli /path/to/your/aegis-backup.json --group Finance`):
 
-```
+```text
 --- All OTPs ---
 #   Issuer             Name               Code    Group              Note
 --- ---                ----               ----    -----              ----
 1   Bank of America    MyBank             ******  Finance            Checking Account
 
-Time until next refresh: 25.0 seconds
-
 Make a selection to reveal the OTP code (or press Ctrl+C to exit): 
+
+Time until next refresh: 25.0 seconds
 ```
 
 A command-line interface (CLI) tool for viewing Aegis Authenticator Time-based One-Time Passwords (TOTP).
@@ -57,7 +57,8 @@ A command-line interface (CLI) tool for viewing Aegis Authenticator Time-based O
 *   Continuously displays OTP codes for all entries in a real-time refreshing table.
 *   Automatically refreshes OTPs based on their configured periods, with a live countdown that updates in place.
 *   Outputs OTPs in a clear, sorted table format (by Issuer), including Issuer, Name, Code, Group, and Note.
-*   Interactive mode to reveal obscured OTP codes on demand.
+*   Interactive mode to reveal obscured OTP codes on demand, highlighting the revealed entry in bold white and dimming others.
+*   Defaults to colored output, with an option to disable colors using the `--no-color` flag.
 *   Supports filtering OTP entries by group name.
 *   Purely command-line based, with no graphical interface.
 
@@ -95,7 +96,7 @@ If your vault requires a password, you will be prompted securely. For non-intera
 
 ```bash
 export AEGIS_CLI_PASSWORD="YourVaultPassword"
-aegis-cli /path/to/your/aegis-backup.json
+aegis-cli /path/to/your/aegis-backup.json --no-color
 ```
 
 ## License

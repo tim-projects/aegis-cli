@@ -5,7 +5,17 @@ import time
 
 from aegis_core import find_vault_path, read_and_decrypt_vault_file, get_otps, get_ttn
 
+# ANSI escape codes for colors
+COLOR_RESET = "\033[0m"
+COLOR_DIM = "\033[2m"
+COLOR_BOLD_WHITE = "\033[1;97m"
+
 DEFAULT_AEGIS_VAULT_DIR = os.path.expanduser("~/.config/aegis")
+
+def apply_color(text, color_code, no_color_flag):
+    if no_color_flag:
+        return text
+    return f"{color_code}{text}{COLOR_RESET}"
 
 def main():
     parser = argparse.ArgumentParser(description="Aegis Authenticator CLI in Python.", prog="aegis-cli")
@@ -14,6 +24,7 @@ def main():
     parser.add_argument("-u", "--uuid", help="Display OTP for a specific entry UUID.")
     parser.add_argument("-g", "--group", help="Filter OTP entries by a specific group name.")
     parser.add_argument("positional_vault_path", nargs="?", help=argparse.SUPPRESS, default=None)
+    parser.add_argument("--no-color", action="store_true", help="Disable colored output.")
 
     args = parser.parse_args()
 
@@ -72,6 +83,7 @@ def main():
         try:
             revealed_otps = set() # Keep track of which OTPs are revealed
             while True:
+                revealed_otps.clear() # Clear previously revealed OTPs on each refresh
                 os.system('clear') # Clear the screen for each refresh
                 print("--- All OTPs ---")
                 
@@ -144,19 +156,22 @@ def main():
                     otp_value = "******" # Obscure by default
                     if uuid in otps and uuid in revealed_otps:
                         otp_value = otps[uuid].string()
-                    elif uuid in otps:
-                        otp_value = "******"
                     
-                    print(f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}")
+                    # Apply coloring
+                    if uuid in revealed_otps:
+                        line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
+                        print(apply_color(line, COLOR_BOLD_WHITE, args.no_color))
+                    else:
+                        line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
+                        print(apply_color(line, COLOR_DIM, args.no_color))
                 
                 # After countdown, prompt for input
-                print("\nMake a selection to reveal the OTP code (or press Ctrl+C to exit): ", end='')
+                prompt_text = "\nMake a selection to reveal the OTP code (or press Ctrl+C to exit): "
+                print(apply_color(prompt_text, COLOR_DIM, args.no_color), end='')
                 try:
                     selection = input()
                     if selection.isdigit():
                         selected_index = int(selection)
-                        # Clear previously revealed OTPs and add the new one
-                        revealed_otps.clear()
                         for item in display_data:
                             if item["index"] == selected_index:
                                 revealed_otps.add(item["uuid"])
@@ -164,7 +179,7 @@ def main():
                 except KeyboardInterrupt:
                     raise # Re-raise to be caught by the outer KeyboardInterrupt handler
                 except EOFError: # Handle cases where input stream might close (e.g., non-interactive shell)
-                    print("\nNon-interactive session detected. Exiting.")
+                    print(apply_color("\nNon-interactive session detected. Exiting.", COLOR_DIM, args.no_color))
                     os.system('clear')
                     return
 
@@ -173,7 +188,8 @@ def main():
 
                 # Countdown loop
                 for remaining_seconds in range(initial_ttn_seconds, 0, -1):
-                    print(f"\n\rTime until next refresh: {remaining_seconds:.1f} seconds", end='')
+                    countdown_text = f"\n\rTime until next refresh: {remaining_seconds:.1f} seconds"
+                    print(apply_color(countdown_text, COLOR_DIM, args.no_color), end='')
                     time.sleep(1)
                     os.system('clear') # Clear for next second of countdown
                     print("--- All OTPs ---")
@@ -191,10 +207,14 @@ def main():
                         otp_value = "******"
                         if uuid in otps and uuid in revealed_otps:
                             otp_value = otps[uuid].string()
-                        elif uuid in otps:
-                            otp_value = "******"
                         
-                        print(f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}")
+                        # Apply coloring
+                        if uuid in revealed_otps:
+                            line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
+                            print(apply_color(line, COLOR_BOLD_WHITE, args.no_color))
+                        else:
+                            line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
+                            print(apply_color(line, COLOR_DIM, args.no_color))
 
 if __name__ == "__main__":
     main()

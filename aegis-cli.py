@@ -23,7 +23,8 @@ def main():
         print(f"Searching for vault in {os.path.abspath(args.vault_dir)}...")
         vault_path = find_vault_path(args.vault_dir)
         if not vault_path:
-            print("Error: No vault file found. Please specify with -v, provide a .json file as a positional argument, or ensure one exists in the vault directory.")
+            print("Error: No vault file found.")
+            parser.print_help()
             return
         print(f"Found vault: {vault_path}")
 

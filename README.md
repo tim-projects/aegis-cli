@@ -2,29 +2,49 @@
 
 ### Example Output
 
-When run without a group filter:
+When run without a group filter, OTP codes are obscured by default:
 
 ```
 --- All OTPs ---
-Issuer             Name               Code    Group              Note
-------             ----               ----    -----              ----
-Bank of America    MyBank             123456  Finance            Checking Account
-Facebook           MySocial           345678  Social             Personal Profile
-Google             MyEmail            789012  Personal           Primary Email
-Steam              MyGaming           901234  Gaming             Steam Account
+#   Issuer             Name               Code    Group              Note
+--- ---                ----               ----    -----              ----
+1   Bank of America    MyBank             ******  Finance            Checking Account
+2   Facebook           MySocial           ******  Social             Personal Profile
+3   Google             MyEmail            ******  Personal           Primary Email
+4   Steam              MyGaming           ******  Gaming             Steam Account
 
 Time until next refresh: 25.0 seconds
+
+Make a selection to reveal the OTP code (or press Ctrl+C to exit): 
+```
+
+After entering '1' to reveal the first OTP:
+
+```
+--- All OTPs ---
+#   Issuer             Name               Code    Group              Note
+--- ---                ----               ----    -----              ----
+1   Bank of America    MyBank             123456  Finance            Checking Account
+2   Facebook           MySocial           ******  Social             Personal Profile
+3   Google             MyEmail            ******  Personal           Primary Email
+4   Steam              MyGaming           ******  Gaming             Steam Account
+
+Time until next refresh: 25.0 seconds
+
+Make a selection to reveal the OTP code (or press Ctrl+C to exit): 
 ```
 
 When filtering by a specific group (e.g., `aegis-cli /path/to/your/aegis-backup.json --group Finance`):
 
 ```
 --- All OTPs ---
-Issuer             Name               Code    Group              Note
-------             ----               ----    -----              ----
-Bank of America    MyBank             123456  Finance            Checking Account
+#   Issuer             Name               Code    Group              Note
+--- ---                ----               ----    -----              ----
+1   Bank of America    MyBank             ******  Finance            Checking Account
 
 Time until next refresh: 25.0 seconds
+
+Make a selection to reveal the OTP code (or press Ctrl+C to exit): 
 ```
 
 A command-line interface (CLI) tool for viewing Aegis Authenticator Time-based One-Time Passwords (TOTP).
@@ -37,6 +57,7 @@ A command-line interface (CLI) tool for viewing Aegis Authenticator Time-based O
 *   Continuously displays OTP codes for all entries in a real-time refreshing table.
 *   Automatically refreshes OTPs based on their configured periods, with a live countdown that updates in place.
 *   Outputs OTPs in a clear, sorted table format (by Issuer), including Issuer, Name, Code, Group, and Note.
+*   Interactive mode to reveal obscured OTP codes on demand.
 *   Supports filtering OTP entries by group name.
 *   Purely command-line based, with no graphical interface.
 

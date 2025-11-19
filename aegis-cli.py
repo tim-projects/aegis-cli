@@ -26,7 +26,7 @@ def load_config():
                 if "default_color_mode" not in config: config["default_color_mode"] = True # Default to color enabled
                 return config
         except json.JSONDecodeError:
-            print(f"Warning: Could not parse config file {CONFIG_FILE_FILE_PATH}. Using default config.")
+            print(f"Warning: Could not parse config file {CONFIG_FILE_PATH}. Using default config.")
     return {"last_opened_vault": None, "last_vault_dir": None, "default_color_mode": True}
 
 def save_config(config):
@@ -89,7 +89,7 @@ def main():
             except Exception:
                 print("Warning: getpass failed. Falling back to insecure password input.")
                 password = input("Enter vault password (will be echoed): ")
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, EOFError):
             print("\nExiting.")
             os.system('clear')
             return
@@ -205,9 +205,8 @@ def main():
                         line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
                         print(apply_color(line, COLOR_DIM, args.no_color))
                 
-                # Only prompt for input if there's more than one item or if the single item isn't already revealed
-                # Only prompt for input if there's more than one item or if the single item isn't already revealed
-                if len(display_data) > 1 or (len(display_data) == 1 and display_data[0]["uuid"] not in revealed_otps):
+                # Only prompt for input if there's more than one item
+                if len(display_data) > 1:
                     prompt_text = "\nMake a selection to reveal the OTP code (or press Ctrl+C to exit): "
                     print(apply_color(prompt_text, COLOR_DIM, args.no_color), end='')
                     try:
@@ -225,9 +224,9 @@ def main():
                     except EOFError: # Handle cases where input stream might close (e.g., non-interactive shell)
                         print(apply_color("\nNon-interactive session detected. Exiting.", COLOR_DIM, args.no_color))
                         os.system('clear')
-                        return                else:
-                    # If only one item and it's already revealed, just wait for countdown
-                    pass
+                        return
+                # If only one item and it's already revealed, just wait for countdown (no prompt needed)
+                # The 'revealed_otps.add(display_data[0]["uuid"])' line above already handles revealing it.
 
                 ttn = get_ttn()
                 initial_ttn_seconds = int(ttn / 1000)
@@ -261,6 +260,12 @@ def main():
                         else:
                             line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
                             print(apply_color(line, COLOR_DIM, args.no_color))
+        
+        # This is the new block that fixes the error
+        except KeyboardInterrupt:
+            print("\nExiting.")
+            os.system('clear')
+            return
 
 if __name__ == "__main__":
     main()

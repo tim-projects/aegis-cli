@@ -4,6 +4,7 @@ import os
 import time
 import json
 from pathlib import Path
+import readchar
 
 from aegis_core import find_vault_path, read_and_decrypt_vault_file, get_otps, get_ttn
 
@@ -91,7 +92,7 @@ def main():
                 password = input("Enter vault password (will be echoed): ")
         except (KeyboardInterrupt, EOFError):
             print("\nExiting.")
-            os.system('clear')
+            os.system("clear")
             return
 
     try:
@@ -118,68 +119,80 @@ def main():
     else:
         try:
             revealed_otps = set() # Keep track of which OTPs are revealed
+            search_term = ""
             while True:
-                # Do not clear revealed_otps here; it should persist until a new selection is made.
-                os.system('clear') # Clear the screen for each refresh
+                os.system("clear") # Clear the screen for each refresh
                 print("--- All OTPs ---")
+                
+                otps = get_otps(vault_data)
 
-                # Collect data and calculate max widths
                 display_data = []
-                max_name_len = 0
-                max_issuer_len = 0
-                max_group_len = 0
-                max_note_len = 0
+                max_name_len = len("Name")
+                max_issuer_len = len("Issuer")
+                max_group_len = len("Group")
+                max_note_len = len("Note")
 
-                # Create a mapping of group UUIDs to group names
                 group_names = {group.uuid: group.name for group in vault_data.db.groups}
 
+                all_entries = []
                 for entry in vault_data.db.entries:
-                    # Resolve group UUIDs to names
                     resolved_groups = []
                     for group_uuid in entry.groups:
-                        resolved_groups.append(group_names.get(group_uuid, group_uuid)) # Fallback to UUID if name not found
+                        resolved_groups.append(group_names.get(group_uuid, group_uuid))
                     
-                    # Apply group filter if provided
                     if args.group and args.group not in resolved_groups:
                         continue
 
-                    name = entry.name
-                    issuer = entry.issuer if entry.issuer else ""
-                    groups = ", ".join(resolved_groups) if resolved_groups else ""
-                    note = entry.note if entry.note else ""
-                    uuid = entry.uuid
-
-                    display_data.append({
-                        "name": name,
-                        "issuer": issuer,
-                        "groups": groups,
-                        "note": note,
-                        "uuid": uuid
+                    all_entries.append({
+                        "name": entry.name,
+                        "issuer": entry.issuer if entry.issuer else "",
+                        "groups": ", ".join(resolved_groups) if resolved_groups else "",
+                        "note": entry.note if entry.note else "",
+                        "uuid": entry.uuid
                     })
-
-                    if len(name) > max_name_len:
-                        max_name_len = len(name)
-                    if len(issuer) > max_issuer_len:
-                        max_issuer_len = len(issuer)
-                    if len(groups) > max_group_len:
-                        max_group_len = len(groups)
-                    if len(note) > max_note_len:
-                        max_note_len = len(note)
                 
                 # Sort alphabetically by issuer
-                display_data.sort(key=lambda x: x["issuer"].lower())
+                all_entries.sort(key=lambda x: x["issuer"].lower())
 
-                # Assign 1-based index after sorting
-                for i, item in enumerate(display_data):
-                    item["index"] = i + 1
+                # Apply search filter
+                filtered_entries = []
+                for i, item in enumerate(all_entries):
+                    item["index"] = i + 1 # Assign 1-based index
+                    search_string_match = (
+                        search_term.lower() in item["name"].lower() or
+                        search_term.lower() in item["issuer"].lower() or
+                        search_term.lower() in item["groups"].lower() or
+                        search_term.lower() in item["note"].lower()
+                    )
+                    # Also allow searching by index number
+                    if search_term.isdigit() and int(search_term) == item["index"]:
+                        search_string_match = True
 
-                # If only one item, instantly reveal it
+                    if not search_term or search_string_match:
+                        filtered_entries.append(item)
+                
+                display_data = filtered_entries
+
+                for item in display_data:
+                    if len(item["name"]) > max_name_len:
+                        max_name_len = len(item["name"])
+                    if len(item["issuer"]) > max_issuer_len:
+                        max_issuer_len = len(item["issuer"])
+                    if len(item["groups"]) > max_group_len:
+                        max_group_len = len(item["groups"])
+                    if len(item["note"]) > max_note_len:
+                        max_note_len = len(item["note"])
+
+                # Conditional OTP revelation and clearing based on filtered results
                 if len(display_data) == 1:
-                    revealed_otps.add(display_data[0]["uuid"])
+                    if display_data[0]["uuid"] not in revealed_otps:
+                        revealed_otps.add(display_data[0]["uuid"])
+                elif len(display_data) != 1 and len(revealed_otps) > 0:
+                    revealed_otps.clear()
 
                 # Print header
-                print(f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}")
-                print(f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}")
+                print(f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}", flush=True)
+                print(f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}", flush=True)
 
                 # Print formatted output
                 for item in display_data:
@@ -197,70 +210,73 @@ def main():
                     # Apply coloring
                     if uuid in revealed_otps:
                         line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
-                        print(apply_color(line, COLOR_BOLD_WHITE, args.no_color))
+                        print(apply_color(line, COLOR_BOLD_WHITE, args.no_color), flush=True) # Added flush=True
                     else:
                         line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
-                        print(apply_color(line, COLOR_DIM, args.no_color))
+                        print(apply_color(line, COLOR_DIM, args.no_color), flush=True) # Added flush=True
+
+                print(f"\nType the name or line number to reveal OTP code (Ctrl+C to exit): {search_term}", end='', flush=True)
                 
-                # Only prompt for input if there's more than one item
-                if len(display_data) > 1:
-                    prompt_text = "\nMake a selection to reveal the OTP code (or press Ctrl+C to exit): "
-                    print(apply_color(prompt_text, COLOR_DIM, args.no_color), end='')
-                    try:
-                        selection = input()
-                        if selection.isdigit():
-                            selected_index = int(selection)
-                            # Clear previously revealed OTPs and add the new one
-                            revealed_otps.clear()
-                            for item in display_data:
-                                if item["index"] == selected_index:
-                                    revealed_otps.add(item["uuid"])
-                                    break
-                    except KeyboardInterrupt:
-                        raise # Re-raise to be caught by the outer KeyboardInterrupt handler
-                    except EOFError: # Handle cases where input stream might close (e.g., non-interactive shell)
-                        print(apply_color("\nNon-interactive session detected. Exiting.", COLOR_DIM, args.no_color))
-                        os.system('clear')
-                        return
-                # If only one item and it's already revealed, just wait for countdown (no prompt needed)
-                # The 'revealed_otps.add(display_data[0]["uuid"])' line above already handles revealing it.
+                try:
+                    key = readchar.readkey()
+                    if key == readchar.key.BACKSPACE:
+                        search_term = search_term[:-1]
+                    elif key == readchar.key.CTRL_C:
+                        raise KeyboardInterrupt
+                    elif key == readchar.key.ESC: # Handle Esc key to clear search term
+                        search_term = ""
+                        revealed_otps.clear() # Clear revealed OTPs on filter reset
+                    elif key == readchar.key.ENTER:
+                        # If enter is pressed and there is exactly one filtered entry, reveal it
+                        if len(filtered_entries) == 1 and filtered_entries[0]["uuid"] not in revealed_otps:
+                            revealed_otps.add(filtered_entries[0]["uuid"])
+                        # If enter is pressed and there is more than one entry, or no entry, or already revealed, do nothing.
+                    else:
+                        search_term += key
 
-                ttn = get_ttn()
-                initial_ttn_seconds = int(ttn / 1000)
+                except KeyboardInterrupt:
+                    raise # Re-raise to be caught by the outer KeyboardInterrupt handler
+                except EOFError: # Handle cases where input stream might close (e.g., non-interactive shell)
+                    print(apply_color("\nNon-interactive session detected. Exiting.", COLOR_DIM, args.no_color), flush=True)
+                    os.system('clear')
+                    return
 
-                # Countdown loop
-                for remaining_seconds in range(initial_ttn_seconds, 0, -1):
-                    countdown_text = f"\n\rTime until next refresh: {remaining_seconds:.1f} seconds"
-                    print(apply_color(countdown_text, COLOR_DIM, args.no_color), end='')
-                    time.sleep(1)
-                    os.system('clear') # Clear for next second of countdown
-                    print("--- All OTPs ---")
-                    # Recalculate OTPs for the current time, as they might change during the countdown
-                    otps = get_otps(vault_data)
-                    # Re-print header and OTPs
-                    print(f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}")
-                    print(f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}")
-                    for item in display_data:
-                        index = item["index"]
-                        name = item["name"]
-                        issuer = item["issuer"]
-                        groups = item["groups"]
-                        note = item["note"]
-                        uuid = item["uuid"]
+                # Conditional Countdown loop
+                if len(display_data) == 1 and display_data[0]["uuid"] in revealed_otps:
+                    ttn = get_ttn()
+                    initial_ttn_seconds = int(ttn / 1000)
 
-                        otp_value = "******"
-                        if uuid in otps and uuid in revealed_otps:
-                            otp_value = otps[uuid].string()
-                        
-                        # Apply coloring
-                        if uuid in revealed_otps:
-                            line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
-                            print(apply_color(line, COLOR_BOLD_WHITE, args.no_color))
-                        else:
-                            line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
-                            print(apply_color(line, COLOR_DIM, args.no_color))
+                    for remaining_seconds in range(initial_ttn_seconds, 0, -1):
+                        countdown_text = f"\n\rTime until next refresh: {remaining_seconds:.1f} seconds"
+                        print(apply_color(countdown_text, COLOR_DIM, args.no_color), end='', flush=True) # Added flush=True
+                        time.sleep(1)
+                        os.system('clear') # Clear for next second of countdown
+                        print("--- All OTPs ---", flush=True) # Added flush=True
+                        # Recalculate OTPs for the current time, as they might change during the countdown
+                        otps = get_otps(vault_data)
+                        # Re-print header and OTPs (logic for re-printing header and OTPs already exists in the main loop)
+                        print(f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}", flush=True)
+                        print(f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}", flush=True)
+                        for item in display_data:
+                            index = item["index"]
+                            name = item["name"]
+                            issuer = item["issuer"]
+                            groups = item["groups"]
+                            note = item["note"]
+                            uuid = item["uuid"]
+
+                            otp_value = "******" # Obscure by default
+                            if uuid in otps and uuid in revealed_otps:
+                                otp_value = otps[uuid].string()
+                            
+                            # Apply coloring
+                            if uuid in revealed_otps:
+                                line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
+                                print(apply_color(line, COLOR_BOLD_WHITE, args.no_color), flush=True)
+                            else:
+                                line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
+                                print(apply_color(line, COLOR_DIM, args.no_color), flush=True)
         
-        # This is the new block that fixes the error
         except KeyboardInterrupt:
             print("\nExiting.")
             os.system('clear')

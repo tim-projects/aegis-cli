@@ -6,6 +6,9 @@ from io import StringIO
 import readchar
 import importlib.util
 
+# Add the project root to sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 # Load aegis-cli.py as a module
 spec = importlib.util.spec_from_file_location("aegis_cli", os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'aegis-cli.py')))
 aegis_cli = importlib.util.module_from_spec(spec)
@@ -17,31 +20,33 @@ from aegis_core import OTP, Entry # Corrected import
 class TestAegisCliInteractive(unittest.TestCase):
 
     def test_search_as_you_type_single_match_reveal(self):
-        with \
-            patch.object(aegis_cli, 'read_and_decrypt_vault_file') as mock_decrypt_vault,\
-            patch.object(aegis_cli, 'get_otps') as mock_get_otps,\
-            patch('os.system') as mock_os_system,\
-            patch('readchar.readkey') as mock_readkey,\
-            patch('sys.stdout', new_callable=StringIO) as mock_stdout,\
-            patch('getpass.getpass', return_value='dummy_password') as mock_getpass,\
-            patch('builtins.input', return_value='dummy_password') as mock_input,\
+        with (
+            patch.object(aegis_cli, 'read_and_decrypt_vault_file') as mock_decrypt_vault,
+            patch.object(aegis_cli, 'get_otps') as mock_get_otps,
+            patch('os.system') as mock_os_system,
+            patch('readchar.readkey') as mock_readkey,
+            patch('sys.stdout', new_callable=StringIO) as mock_stdout,
+            patch('getpass.getpass', return_value='dummy_password') as mock_getpass,
+            patch('builtins.input', return_value='dummy_password') as mock_input,
             patch.object(aegis_cli, 'load_config', return_value={
-                "last_opened_vault": None,\
-                "last_vault_dir": None,\
+                "last_opened_vault": None,
+                "last_vault_dir": None,
                 "default_color_mode": True
-            }) as mock_load_config,\
-            patch.object(aegis_cli, 'save_config') as mock_save_config,\
-            patch('sys.argv', ['aegis-cli.py', '--vault-path', '/mock/vault/path.json']):
+            }) as mock_load_config,
+            patch.object(aegis_cli, 'save_config') as mock_save_config,
+            patch('sys.argv', ['aegis-cli.py', '--vault-path', '/mock/vault/path.json']),
+            patch('select.select') as mock_select_select
+        ):
             # Mock vault data and OTPs
             mock_vault_data = MagicMock()
-            entry1 = MagicMock(spec=Entry)
+            entry1 = MagicMock()
             entry1.name = "Test OTP 1"
             entry1.issuer = "Issuer A"
             entry1.groups = []
             entry1.note = ""
             entry1.uuid = "uuid1"
-
-            entry2 = MagicMock(spec=Entry)
+    
+            entry2 = MagicMock()
             entry2.name = "Another OTP"
             entry2.issuer = "Issuer B"
             entry2.groups = []
@@ -50,17 +55,25 @@ class TestAegisCliInteractive(unittest.TestCase):
             mock_vault_data.db.entries = [entry1, entry2]
             mock_vault_data.db.groups = [] # No groups to mock for this test
             mock_decrypt_vault.return_value = mock_vault_data
-
+    
             mock_get_otps.return_value = {
-                "uuid1": MagicMock(spec=OTP, uuid="uuid1", name="Test OTP 1", issuer="Issuer A", secret="SECRET1", string=lambda: "SECRET1"),
-                "uuid2": MagicMock(spec=OTP, uuid="uuid2", name="Another OTP", issuer="Issuer B", secret="SECRET2", string=lambda: "SECRET2"),
+                "uuid1": MagicMock(uuid="uuid1", name="Test OTP 1", issuer="Issuer A", secret="SECRET1", string=lambda: "SECRET1"),
+                "uuid2": MagicMock(uuid="uuid2", name="Another OTP", issuer="Issuer B", secret="SECRET2", string=lambda: "SECRET2"),
             }
-
             # Simulate user typing "Test" then Enter
-            mock_readkey.side_effect = ['T', 'e', 's', 't', readchar.key.ENTER, readchar.key.CTRL_C]
-
+            readkey_side_effects = ['T', 'e', 's', 't', readchar.key.ENTER, readchar.key.CTRL_C]
+            mock_readkey.side_effect = readkey_side_effects
+    
             # Mock os.system('clear') to do nothing
             mock_os_system.return_value = None
+    
+            # Mock select.select to simulate input availability
+            def select_side_effect(read_list, write_list, error_list, timeout):
+                # Check if there are still elements in the original readkey_side_effects list
+                if mock_readkey.call_count < len(readkey_side_effects):
+                    return ([sys.stdin], [], [])
+                return ([], [], [])
+            mock_select_select.side_effect = select_side_effect
 
             try:
                 aegis_cli.main()
@@ -68,31 +81,33 @@ class TestAegisCliInteractive(unittest.TestCase):
                 pass # argparse.parse_args() can call sys.exit()
 
             output = mock_stdout.getvalue()
-            
+        
             # Verify that "Test OTP 1" is revealed
             self.assertIn("Test OTP 1", output)
             self.assertIn("SECRET1", output)
             self.assertNotIn("SECRET2", output) # Ensure other OTPs are not revealed
 
     def test_search_as_you_type_no_match(self):
-        with \
-            patch.object(aegis_cli, 'read_and_decrypt_vault_file') as mock_decrypt_vault,\
-            patch.object(aegis_cli, 'get_otps') as mock_get_otps,\
-            patch('os.system') as mock_os_system,\
-            patch('readchar.readkey') as mock_readkey,\
-            patch('sys.stdout', new_callable=StringIO) as mock_stdout,\
-            patch('getpass.getpass', return_value='dummy_password') as mock_getpass,\
-            patch('builtins.input', return_value='dummy_password') as mock_input,\
+        with (
+            patch.object(aegis_cli, 'read_and_decrypt_vault_file') as mock_decrypt_vault,
+            patch.object(aegis_cli, 'get_otps') as mock_get_otps,
+            patch('os.system') as mock_os_system,
+            patch('readchar.readkey') as mock_readkey,
+            patch('sys.stdout', new_callable=StringIO) as mock_stdout,
+            patch('getpass.getpass', return_value='dummy_password') as mock_getpass,
+            patch('builtins.input', return_value='dummy_password') as mock_input,
             patch.object(aegis_cli, 'load_config', return_value={
-                "last_opened_vault": None,\
-                "last_vault_dir": None,\
+                "last_opened_vault": None,
+                "last_vault_dir": None,
                 "default_color_mode": True
-            }) as mock_load_config,\
-            patch.object(aegis_cli, 'save_config') as mock_save_config,\
-            patch('sys.argv', ['aegis-cli.py', '--vault-path', '/mock/vault/path.json']):
+            }) as mock_load_config,
+            patch.object(aegis_cli, 'save_config') as mock_save_config,
+            patch('sys.argv', ['aegis-cli.py', '--vault-path', '/mock/vault/path.json']),
+            patch('select.select') as mock_select_select
+        ):
             # Mock vault data and OTPs
             mock_vault_data = MagicMock()
-            entry1 = MagicMock(spec=Entry)
+            entry1 = MagicMock()
             entry1.name = "Test OTP 1"
             entry1.issuer = "Issuer A"
             entry1.groups = []
@@ -101,16 +116,24 @@ class TestAegisCliInteractive(unittest.TestCase):
             mock_vault_data.db.entries = [entry1]
             mock_vault_data.db.groups = []
             mock_decrypt_vault.return_value = mock_vault_data
-
+    
             mock_get_otps.return_value = {
-                "uuid1": MagicMock(spec=OTP, uuid="uuid1", name="Test OTP 1", issuer="Issuer A", secret="SECRET1", string=lambda: "SECRET1"),
+                "uuid1": MagicMock(uuid="uuid1", name="Test OTP 1", issuer="Issuer A", secret="SECRET1", string=lambda: "SECRET1"),
             }
-
             # Simulate user typing "Nomatch" then Ctrl+C
-            mock_readkey.side_effect = ['N', 'o', 'm', 'a', 't', 'c', 'h', readchar.key.CTRL_C]
-
+            readkey_side_effects = ['N', 'o', 'm', 'a', 't', 'c', 'h', readchar.key.CTRL_C]
+            mock_readkey.side_effect = readkey_side_effects
+    
             # Mock os.system('clear') to do nothing
             mock_os_system.return_value = None
+    
+            # Mock select.select to simulate input availability
+            def select_side_effect(read_list, write_list, error_list, timeout):
+                # Check if there are still elements in the original readkey_side_effects list
+                if mock_readkey.call_count < len(readkey_side_effects):
+                    return ([sys.stdin], [], [])
+                return ([], [], [])
+            mock_select_select.side_effect = select_side_effect
 
             try:
                 aegis_cli.main()
@@ -133,31 +156,33 @@ class TestAegisCliInteractive(unittest.TestCase):
 
 
     def test_search_as_you_type_multiple_matches_no_reveal(self):
-        with \
-            patch.object(aegis_cli, 'read_and_decrypt_vault_file') as mock_decrypt_vault,\
-            patch.object(aegis_cli, 'get_otps') as mock_get_otps,\
-            patch('os.system') as mock_os_system,\
-            patch('readchar.readkey') as mock_readkey,\
-            patch('sys.stdout', new_callable=StringIO) as mock_stdout,\
-            patch('getpass.getpass', return_value='dummy_password') as mock_getpass,\
-            patch('builtins.input', return_value='dummy_password') as mock_input,\
+        with (
+            patch.object(aegis_cli, 'read_and_decrypt_vault_file') as mock_decrypt_vault,
+            patch.object(aegis_cli, 'get_otps') as mock_get_otps,
+            patch('os.system') as mock_os_system,
+            patch('readchar.readkey') as mock_readkey,
+            patch('sys.stdout', new_callable=StringIO) as mock_stdout,
+            patch('getpass.getpass', return_value='dummy_password') as mock_getpass,
+            patch('builtins.input', return_value='dummy_password') as mock_input,
             patch.object(aegis_cli, 'load_config', return_value={
-                "last_opened_vault": None,\
-                "last_vault_dir": None,\
+                "last_opened_vault": None,
+                "last_vault_dir": None,
                 "default_color_mode": True
-            }) as mock_load_config,\
-            patch.object(aegis_cli, 'save_config') as mock_save_config,\
-            patch('sys.argv', ['aegis-cli.py', '--vault-path', '/mock/vault/path.json']):
+            }) as mock_load_config,
+            patch.object(aegis_cli, 'save_config') as mock_save_config,
+            patch('sys.argv', ['aegis-cli.py', '--vault-path', '/mock/vault/path.json']),
+            patch('select.select') as mock_select_select
+        ):
             # Mock vault data and OTPs
             mock_vault_data = MagicMock()
-            entry1 = MagicMock(spec=Entry)
+            entry1 = MagicMock()
             entry1.name = "Test OTP 1"
             entry1.issuer = "Issuer A"
             entry1.groups = []
             entry1.note = ""
             entry1.uuid = "uuid1"
-
-            entry2 = MagicMock(spec=Entry)
+    
+            entry2 = MagicMock()
             entry2.name = "Test OTP 2"
             entry2.issuer = "Issuer B"
             entry2.groups = []
@@ -166,17 +191,25 @@ class TestAegisCliInteractive(unittest.TestCase):
             mock_vault_data.db.entries = [entry1, entry2]
             mock_vault_data.db.groups = []
             mock_decrypt_vault.return_value = mock_vault_data
-
+    
             mock_get_otps.return_value = {
-                "uuid1": MagicMock(spec=OTP, uuid="uuid1", name="Test OTP 1", issuer="Issuer A", secret="SECRET1", string=lambda: "SECRET1"),
-                "uuid2": MagicMock(spec=OTP, uuid="uuid2", name="Test OTP 2", issuer="Issuer B", secret="SECRET2", string=lambda: "SECRET2"),
+                "uuid1": MagicMock(uuid="uuid1", name="Test OTP 1", issuer="Issuer A", secret="SECRET1", string=lambda: "SECRET1"),
+                "uuid2": MagicMock(uuid="uuid2", name="Test OTP 2", issuer="Issuer B", secret="SECRET2", string=lambda: "SECRET2"),
             }
-
             # Simulate user typing "Test" then Ctrl+C
-            mock_readkey.side_effect = ['T', 'e', 's', 't', readchar.key.CTRL_C]
-
+            readkey_side_effects = ['T', 'e', 's', 't', readchar.key.CTRL_C]
+            mock_readkey.side_effect = readkey_side_effects
+    
             # Mock os.system('clear') to do nothing
             mock_os_system.return_value = None
+    
+            # Mock select.select to simulate input availability
+            def select_side_effect(read_list, write_list, error_list, timeout):
+                # Check if there are still elements in the original readkey_side_effects list
+                if mock_readkey.call_count < len(readkey_side_effects):
+                    return ([sys.stdin], [], [])
+                return ([], [], [])
+            mock_select_select.side_effect = select_side_effect
 
             try:
                 aegis_cli.main()

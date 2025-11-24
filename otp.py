@@ -83,6 +83,9 @@ class SteamOTP(OTP):
     def __init__(self, secret_b32_str: str, algo: str, digits: int, period: int, seconds: int = None):
         self._seconds = seconds if seconds is not None else int(time.time())
         self._totp_secret_bytes = base64.b32decode(secret_b32_str.encode('utf-8'), casefold=True)
+        self._algo = algo
+        self._digits = digits
+        self._period = period
         self._numeric_code = self._generate_numeric_code()
 
     def _generate_numeric_code(self) -> int:

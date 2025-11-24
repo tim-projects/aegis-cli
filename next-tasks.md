@@ -1,11 +1,3 @@
-
-- seperate search mode and reveal otp mode. When searching we don't need the activate the countdown loop. That is only activated when the search has filtered down to 1 entry.
-
-- there should be a config option to set the default of color mode true or false. the config dir should be ~/.config/aegis-cli not ~/.config/aegis
-
-- When the countdown number is less than 10, color the number red
-
-- Have a press the 'ctrl+g' key to filter by group. This would use the same search filter function to select a group, then the list would only show entries that belong to that group, that can be searched in the usual way.
-
-- When an item is revealed, show "Press <Enter> to copy the OTP code to the clipboard.", and this should do that. This needs to support Xorg or Wayland (we would set the clipboard tool used in the config.json). If no config entry is set don't show this interactive option message
-
+- **Color countdown (less than 10s red):** Implement visual cue for OTP countdown when less than 10 seconds remaining.
+- **Interactive Group Filtering (Ctrl+G):** Add interactive functionality to filter by group using `Ctrl+G` key press, leveraging existing search filter function to select a group, then displaying only relevant entries.
+- **Enhanced Clipboard Integration and User Feedback:** Refine clipboard functionality to include configurable clipboard tools (e.g., for Xorg/Wayland via `config.json`) and display the message "Press <Enter> to copy the OTP code to the clipboard." when an item is revealed. This message should only appear if a clipboard tool is configured.

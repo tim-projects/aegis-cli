@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import sys
+import curses
 
 try:
     import pyperclip
@@ -16,10 +17,7 @@ except ImportError:
 
 from aegis_core import find_vault_path, read_and_decrypt_vault_file, get_otps, get_ttn
 
-# ANSI escape codes for colors
-COLOR_RESET = "\033[0m"
-COLOR_DIM = "\033[2m"
-COLOR_BOLD_WHITE = "\033[1;97m"
+
 
 DEFAULT_AEGIS_VAULT_DIR = os.path.expanduser("~/.config/aegis-cli")
 CONFIG_FILE_PATH = Path(DEFAULT_AEGIS_VAULT_DIR) / "config.json"
@@ -43,12 +41,25 @@ def save_config(config):
     with open(CONFIG_FILE_PATH, 'w') as f:
         json.dump(config, f, indent=4)
 
-def apply_color(text, color_code, no_color_flag):
-    if no_color_flag:
-        return text
-    return f"{color_code}{text}{COLOR_RESET}"
 
-def main():
+
+def cli_main(stdscr):
+    stdscr.keypad(True) # Enable special keys like arrow keys
+    curses.curs_set(0)  # Make the cursor invisible
+    curses.noecho()     # Turn off automatic echoing of keys to the screen
+
+    # Initialize colors
+    curses_colors_enabled = False
+    if curses.has_colors():
+        curses.start_color()
+        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK) # Default white on black
+        curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_WHITE) # Highlighted (black on white)
+        curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_BLACK) # Dim white on black (will be adjusted later)
+        curses_colors_enabled = True
+
+    DIM_COLOR = curses.color_pair(3)
+    BOLD_WHITE_COLOR = curses.A_BOLD | curses.color_pair(1)
+
     parser = argparse.ArgumentParser(description="Aegis Authenticator CLI in Python.", prog="aegis-cli")
     parser.add_argument("-v", "--vault-path", help="Path to the Aegis vault file. If not provided, attempts to find the latest in default locations.")
     parser.add_argument("-d", "--vault-dir", help="Directory to search for vault files. Defaults to current directory.", default=".")
@@ -69,26 +80,35 @@ def main():
     if not vault_path and args.positional_vault_path and args.positional_vault_path.endswith(".json"):
         vault_path = args.positional_vault_path
 
+    row = 0
     if not vault_path and config["last_opened_vault"]:
         vault_path = config["last_opened_vault"]
-        print(f"No vault path provided. Opening previously used vault: {vault_path}")
+        stdscr.addstr(row, 0, f"No vault path provided. Opening previously used vault: {vault_path}")
+        row += 1
+        stdscr.refresh()
 
     if not vault_path:
-        # First, try to find in the explicitly provided or default vault_dir
-        print(f"Searching for vault in {os.path.abspath(args.vault_dir)}...")
+        stdscr.addstr(row, 0, f"Searching for vault in {os.path.abspath(args.vault_dir)}...")
+        row += 1
+        stdscr.refresh()
         vault_path = find_vault_path(args.vault_dir)
 
         if not vault_path and args.vault_dir != DEFAULT_AEGIS_VAULT_DIR:
-            # If not found in vault_dir, try the default Aegis config directory
-            print(f"Vault not found in {os.path.abspath(args.vault_dir)}. Searching in {DEFAULT_AEGIS_VAULT_DIR}...")
+            stdscr.addstr(row, 0, f"Vault not found in {os.path.abspath(args.vault_dir)}. Searching in {DEFAULT_AEGIS_VAULT_DIR}...")
+            row += 1
+            stdscr.refresh()
             vault_path = find_vault_path(DEFAULT_AEGIS_VAULT_DIR)
             args.vault_dir = DEFAULT_AEGIS_VAULT_DIR # Update for consistent messaging
 
         if not vault_path:
-            print("Error: No vault file found.")
+            stdscr.addstr(row, 0, "Error: No vault file found.")
+            row += 1
             parser.print_help()
+            stdscr.refresh()
             return
-        print(f"Found vault: {vault_path}")
+        stdscr.addstr(row, 0, f"Found vault: {vault_path}")
+        row += 1
+        stdscr.refresh()
 
     password = os.getenv("AEGIS_CLI_PASSWORD")
     if not password:
@@ -96,26 +116,33 @@ def main():
             try:
                 password = getpass.getpass("Enter vault password: ")
             except Exception:
-                print("Warning: getpass failed. Falling back to insecure password input.")
+                stdscr.addstr(row, 0, "Warning: getpass failed. Falling back to insecure password input.")
+                row += 1
+                stdscr.refresh()
                 password = input("Enter vault password (will be echoed): ")
         except (KeyboardInterrupt, EOFError):
             print("\nExiting.")
-            os.system("clear")
             return
 
     try:
         vault_data = read_and_decrypt_vault_file(vault_path, password)
-        print("Vault decrypted successfully.")
+        stdscr.addstr(row, 0, "Vault decrypted successfully.")
+        row += 1
+        stdscr.refresh()
         # Save the successfully opened vault path to config
         config["last_opened_vault"] = vault_path
         config["last_vault_dir"] = os.path.dirname(vault_path)
         save_config(config)
     except ValueError as e:
-        print(f"Error decrypting vault: {e}")
+        stdscr.addstr(row, 0, f"Error decrypting vault: {e}")
+        row += 1
+        stdscr.refresh()
         return
     except Exception as e:
         import traceback
-        print(f"An unexpected error occurred: {e}")
+        stdscr.addstr(row, 0, f"An unexpected error occurred: {e}")
+        row += 1
+        stdscr.refresh()
         traceback.print_exc()
         return
 
@@ -123,15 +150,21 @@ def main():
         otps = get_otps(vault_data)
         if args.uuid in otps:
             otp_entry = otps[args.uuid]
-            print(f"OTP for {args.uuid}: {otp_entry.string()}")
+            stdscr.addstr(row, 0, f"OTP for {args.uuid}: {otp_entry.string()}")
+            row += 1
+            stdscr.refresh()
         else:
-            print(f"Error: No entry found with UUID {args.uuid}.")
+            stdscr.addstr(row, 0, f"Error: No entry found with UUID {args.uuid}.")
+            row += 1
+            stdscr.refresh()
 
     # Main interactive loop for search and reveal modes
     try:
         revealed_otps = set() # Keep track of which OTPs are revealed
         search_term = ""
         current_mode = "search" # Initialize mode
+        selected_index_for_reveal = None # Initialize to None
+        selected_row = 0 # Track the currently highlighted row for navigation
         
         while True:
             os.system("clear") # Clear the screen for each refresh
@@ -192,40 +225,63 @@ def main():
                 if len(item["note"]) > max_note_len: max_note_len = len(item["note"])
 
             # --- Mode Management & Display ---
-            if len(display_data) == 1 and current_mode == "search" and search_term:
-                # Automatic transition to Reveal Mode
-                if display_data[0]["uuid"] not in revealed_otps:
-                    revealed_otps.add(display_data[0]["uuid"])
+            entry_to_reveal = None
+
+            # Check if an entry was selected for reveal via Enter key
+            if selected_index_for_reveal is not None:
+                # Find the actual entry from filtered_entries using its original 'index' (1-based)
+                # which was stored in selected_index_for_reveal
+                for item in filtered_entries:
+                    if item["index"] == selected_index_for_reveal:
+                        entry_to_reveal = item
+                        break
+                selected_index_for_reveal = None # Reset after processing
+
+            # If no manual selection, check for auto-reveal (single match with non-empty search term)
+            elif len(filtered_entries) == 1 and current_mode == "search" and search_term:
+                entry_to_reveal = filtered_entries[0]
+
+            if entry_to_reveal:
+                if entry_to_reveal["uuid"] not in revealed_otps:
+                    revealed_otps.add(entry_to_reveal["uuid"])
                 current_mode = "reveal"
-                if PYPERCLIP_AVAILABLE: # Auto-copy on reveal
-                    otp_to_copy = otps[display_data[0]["uuid"]].string()
+                # Auto-copy logic (already exists and uses PYPERCLIP_AVAILABLE)
+                if PYPERCLIP_AVAILABLE:
+                    otp_to_copy = otps[entry_to_reveal["uuid"]].string()
                     pyperclip.copy(otp_to_copy)
-                    # No need for a visible message here, as it will immediately clear
-            elif len(display_data) != 1 and current_mode == "reveal":
-                # Automatically exit Reveal Mode if filter changes (e.g., search term deleted)
+                # Reset selected_row after revealing
+                selected_row = 0
+            elif len(filtered_entries) != 1 and current_mode == "reveal":
+                # Automatically exit Reveal Mode if filter changes (e.g., search term deleted or new search)
                 revealed_otps.clear()
                 current_mode = "search"
-            elif len(display_data) != 1 and len(revealed_otps) > 0: # This case is for search mode when filter changes
+            elif len(filtered_entries) != 1 and len(revealed_otps) > 0: # This case is for search mode when filter changes
                 revealed_otps.clear()
+
+            row = 0 # Reset row for each refresh
 
             # Print header based on mode and search
             if current_mode == "search":
                 if not search_term and not args.group:
-                    print("--- All OTPs ---")
+                    stdscr.addstr(row, 0, "--- All OTPs ---")
                 elif args.group:
-                    print(f"--- Group: {args.group} ---")
+                    stdscr.addstr(row, 0, f"--- Group: {args.group} ---")
                 else:
-                    print(f"--- Search: {search_term} ---")
+                    stdscr.addstr(row, 0, f"--- Search: {search_term} ---")
             elif current_mode == "reveal" and len(display_data) == 1:
-                 print(f"--- Revealed OTP: {display_data[0]['name']} ---")
+                 stdscr.addstr(row, 0, f"--- Revealed OTP: {display_data[0]['name']} ---")
+            row += 1
+
 
 
             # Print header for table
-            print(f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}", flush=True)
-            print(f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}", flush=True)
+            stdscr.addstr(row, 0, f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}")
+            row += 1
+            stdscr.addstr(row, 0, f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}")
+            row += 1
 
             # Print formatted output
-            for item in display_data:
+            for i, item in enumerate(display_data): # Use enumerate to get the index for highlighting
                 index = item["index"]
                 name = item["name"]
                 issuer = item["issuer"]
@@ -241,21 +297,51 @@ def main():
                     except Exception as e:
                         otp_value = f"ERROR: {e}"
                 
-                # Apply coloring
-                if uuid in revealed_otps:
-                    line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
-                    print(apply_color(line, COLOR_BOLD_WHITE, args.no_color), flush=True)
-                else:
-                    line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
-                    print(apply_color(line, COLOR_DIM, args.no_color), flush=True)
+                line = f"{str(index).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
 
-            # --- Input Handling for "Enter-to-Search" Mode ---
+                # Determine color attribute
+                attribute = curses.A_NORMAL
+                if curses_colors_enabled:
+                    if uuid in revealed_otps:
+                        attribute = BOLD_WHITE_COLOR
+                    elif i == selected_row and current_mode == "search": # Highlight if selected in search mode
+                        attribute = curses.A_REVERSE | curses.color_pair(2) # Reverse video for highlight
+                    else:
+                        attribute = DIM_COLOR
+                
+                stdscr.addstr(row, 0, line, attribute)
+                row += 1
+            stdscr.refresh()
+
+            # --- Input Handling for "Search" Mode with Arrow Key Navigation ---
             if current_mode == "search":
-                search_term = input(f"\nType the name or line number to search (Ctrl+C to exit): ")
-                if not search_term: # If user just presses Enter, clear previous search
+                stdscr.addstr(row, 0, f"Type to filter, use arrows to select, Enter to reveal (Ctrl+C to exit): {search_term}")
+                stdscr.refresh()
+
+                char = stdscr.getch() # Get a single character
+
+                if char == curses.KEY_UP:
+                    selected_row = max(0, selected_row - 1)
+                elif char == curses.KEY_DOWN:
+                    selected_row = min(len(filtered_entries) - 1, selected_row + 1) # Use filtered_entries length
+                elif char == curses.KEY_ENTER or char in [10, 13]: # Enter key
+                    if 0 <= selected_row < len(filtered_entries):
+                        selected_index_for_reveal = filtered_entries[selected_row]["index"]
+                        # We don't clear search_term here, as the intent is to reveal the selected item
+                elif char == 27: # ESC key
                     search_term = ""
                     revealed_otps.clear()
-                # No `time.sleep` needed here as `input()` is blocking.
+                    selected_row = 0
+                elif char in [curses.KEY_BACKSPACE, 127, 8]: # Backspace key
+                    search_term = search_term[:-1]
+                    selected_row = 0 # Reset selection on search change
+                elif 32 <= char < 127: # Printable character
+                    search_term += chr(char)
+                    selected_row = 0 # Reset selection on search change
+                elif char == 3: # Ctrl+C
+                    raise KeyboardInterrupt
+                
+                row += 1 # Advance row after input prompt
 
             # Original "Search as you type" logic (retained for reference)
             if False: # Keep this block for historical reference, but it's currently disabled.
@@ -290,21 +376,28 @@ def main():
                 # Inner loop for responsive countdown
                 # Inner loop for responsive countdown
                 for remaining_seconds in range(initial_ttn_seconds, 0, -1):
-                    if PYPERCLIP_AVAILABLE: # Auto-copy on each countdown refresh
+                    if PYPERCLIP_AVAILABLE:
                         pyperclip.copy(otp_to_reveal)
-                    os.system("clear") # Clear for each countdown second
-                    print(f"--- Revealed OTP: {display_data[0]['name']} ---") # Re-print header
-                    print(f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}", flush=True)
-                    print(f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}", flush=True)
+                    stdscr.clear() # Clear for each countdown second
                     
-                    # Re-print the single revealed OTP entry
+                    countdown_row = 0 # Local row counter for reveal mode
+                    stdscr.addstr(countdown_row, 0, f"--- Revealed OTP: {display_data[0]['name']} ---")
+                    countdown_row += 1
+                    
+                    stdscr.addstr(countdown_row, 0, f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}")
+                    countdown_row += 1
+                    stdscr.addstr(countdown_row, 0, f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}")
+                    countdown_row += 1
+                    
                     item = display_data[0]
                     line = f"{str(item['index']).ljust(3)} {item['issuer'].ljust(max_issuer_len)}  {item['name'].ljust(max_name_len)}  {otp_to_reveal.ljust(6)}  {item['groups'].ljust(max_group_len)}  {item['note'].ljust(max_note_len)}"
-                    print(apply_color(line, COLOR_BOLD_WHITE, args.no_color), flush=True)
+                    stdscr.addstr(countdown_row, 0, line, BOLD_WHITE_COLOR if curses_colors_enabled else curses.A_NORMAL)
+                    countdown_row += 1
 
-                    countdown_text = f"\n\rTime until next refresh: {remaining_seconds:.1f} seconds (Press Ctrl+C to exit)"
-                    print(apply_color(countdown_text, COLOR_DIM, args.no_color), end='', flush=True)
+                    countdown_text = f"Time until next refresh: {remaining_seconds:.1f} seconds (Press Ctrl+C to exit)"
+                    stdscr.addstr(countdown_row, 0, countdown_text, DIM_COLOR if curses_colors_enabled else curses.A_NORMAL)
                     
+                    stdscr.refresh() # Refresh screen after all updates
                     time.sleep(1) # Sleep for 1 second
 
                 # After countdown finishes
@@ -314,8 +407,7 @@ def main():
                     
     except KeyboardInterrupt:
         print("\nExiting.")
-        os.system('clear')
         return
 
 if __name__ == "__main__":
-    main()
+    curses.wrapper(cli_main)

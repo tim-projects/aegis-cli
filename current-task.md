@@ -41,7 +41,12 @@ Vault generation and decryption are now successful, and the `aegis-cli.py` appli
 *   **`AssertionError: 'Nomatch' not found in ...` in `tests/test_aegis_cli.py` (`test_search_as_you_type_no_match`):**
     *   **Finding:** The application was incorrectly transitioning to "reveal" mode when the search term was empty and only one OTP entry existed, even if that entry didn't match the subsequent search term. This caused the `test_search_as_you_type_no_match` to fail as it entered reveal mode and displayed an OTP instead of showing no match.
     *   **Mitigation:** Modified the condition for entering "reveal" mode in `aegis-cli.py` to require a non-empty `search_term` in addition to having a single matching entry.
+*   **Filtering not working and rapid blinking of prompt in `aegis-cli.py`:**
+    *   **Finding:** The search-as-you-type filtering was not responsive, and the prompt was blinking rapidly. This was due to the main loop cycling too quickly (`os.system("clear")` being called too often) and the `search_term` not being updated before the prompt was displayed.
+    *   **Mitigation:** Reordered the input processing to ensure `search_term` is updated before the prompt is displayed. Added a `time.sleep(0.1)` in the "search" mode loop to prevent rapid screen clearing and allow for more stable input.
 
 ## Next Steps
-1.  **Commit and push changes:** Perform `git add .`, `git commit`, and `git push` once all verification and testing are complete.
-2.  **Consider adding `pyperclip` and `cryptography` to `requirements.txt`:** Formally declare these important dependencies.
+1.  **Verify filtering and responsiveness:** Confirm with the user that the filtering now works as expected and the rapid blinking has stopped.
+2.  **Commit and push changes:** Perform `git add .`, `git commit`, and `git push` once all verification and testing are complete.
+3.  **Consider adding `pyperclip` and `cryptography` to `requirements.txt`:** Formally declare these important dependencies.
+

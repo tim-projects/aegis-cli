@@ -252,13 +252,12 @@ def main():
 
             # --- Input Handling & Countdown --- General Logic --- 
             key = None
-            if select.select([sys.stdin], [], [], 0.1)[0]: # Check for input with a short timeout
+            # Check for input with a short timeout. This is done regardless of mode, but handled differently.
+            if select.select([sys.stdin], [], [], 0.1)[0]: 
                 key = readchar.readkey() # Read key if input is available
 
             if current_mode == "search":
-                print(f"\nType the name or line number to reveal OTP code (Ctrl+C to exit): {search_term}", end='', flush=True)
-                
-                if key:
+                if key: # Process key if one was pressed
                     if key == readchar.key.BACKSPACE:
                         search_term = search_term[:-1]
                     elif key == readchar.key.CTRL_C:
@@ -267,10 +266,13 @@ def main():
                         search_term = ""
                         revealed_otps.clear()
                     elif key == readchar.key.ENTER:
-                        # Enter key is ignored in search mode, as automatic revelation handles it.
-                        pass
+                        pass # Enter key is ignored in search mode, as automatic revelation handles it.
                     else:
                         search_term += key
+                
+                # Display the prompt *after* processing any new key
+                print(f"\nType the name or line number to reveal OTP code (Ctrl+C to exit): {search_term}", end='', flush=True)
+                time.sleep(0.1) # Add a small delay to prevent rapid blinking and allow user to type
                 
             
             elif current_mode == "reveal" and len(display_data) == 1: # Ensure we are still in a valid reveal state

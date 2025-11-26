@@ -180,8 +180,9 @@ We are now implementing a `ncurses`-based TUI to provide a more intuitive select
     *   The hang after password entry is resolved.
     *   Arrow key navigation works correctly without the display disappearing.
     *   Searching by typing works as expected.
-    *   OTP reveal on Enter, and persistence until ESC, functions properly.
-    *   Colors and highlighting are correct.
+    *   OTP reveal on Enter, and persistence until a single ESC press, functions properly.
+    *   Colors and highlighting are correct, especially the reveal message color (countdown text) and unhighlighted items.
+    *   An error message is displayed for an incorrect password.
 2.  **Update unit tests:** Adjust or create new unit tests to cover the TUI interaction (acknowledging environmental limitations that prevent automated `ncurses` testing).
 3.  **Clean up:** Remove temporary `test_ncurses.py` file (if it still exists).
 4.  **Commit and push changes:** Perform `git add .`, `git commit`, and `git push` once all verification and testing are complete.

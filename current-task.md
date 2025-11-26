@@ -17,6 +17,12 @@ We are now implementing a `ncurses`-based TUI to provide a more intuitive select
 *   **Arrow key navigation not working in Search Mode:**
     *   **Finding:** Pressing `curses.KEY_UP` and `curses.KEY_DOWN` still does not change the `selected_row` as expected, preventing proper navigation of the list.
     *   **Mitigation:** To be investigated and implemented (likely related to `selected_row` being reset).
+*   **Line numbering is incorrect after sorting:**
+    *   **Finding:** The displayed line numbers are the original entry indices, not sequential numbers based on the currently sorted and displayed list. This results in non-contiguous or incorrect numbering.
+    *   **Mitigation:** To be implemented (display `i + 1` from `enumerate(display_data)`).
+*   **Cannot search by typing line number:**
+    *   **Finding:** The search functionality only filters by text content, not by the displayed line numbers.
+    *   **Mitigation:** To be implemented (add logic to interpret numeric `search_term` as a line number).
 *   **Resolved: Type search works fine (moves cursor to first match).**
 *   **Resolved: Enter key correctly initiates Reveal Mode.**
 *   **Resolved: Backspace works correctly in both search and reveal modes.**

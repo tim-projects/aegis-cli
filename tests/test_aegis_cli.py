@@ -76,7 +76,7 @@ class TestAegisCliInteractive(unittest.TestCase):
             mock_select_select.side_effect = select_side_effect
 
             try:
-                aegis_cli.main()
+                mock_curses_wrapper(aegis_cli.cli_main)
             except SystemExit:
                 pass # argparse.parse_args() can call sys.exit()
 
@@ -136,7 +136,7 @@ class TestAegisCliInteractive(unittest.TestCase):
             mock_select_select.side_effect = select_side_effect
 
             try:
-                aegis_cli.main()
+                mock_curses_wrapper(aegis_cli.cli_main)
             except SystemExit:
                 pass
 
@@ -212,7 +212,7 @@ class TestAegisCliInteractive(unittest.TestCase):
             mock_select_select.side_effect = select_side_effect
 
             try:
-                aegis_cli.main()
+                mock_curses_wrapper(aegis_cli.cli_main)
             except SystemExit:
                 pass
 

@@ -43,7 +43,7 @@ def save_config(config):
 
 
 
-def cli_main(stdscr):
+def cli_main(stdscr, args, password):
     stdscr.keypad(True) # Enable special keys like arrow keys
     curses.curs_set(0)  # Make the cursor invisible
     curses.noecho()     # Turn off automatic echoing of keys to the screen
@@ -52,25 +52,25 @@ def cli_main(stdscr):
     curses_colors_enabled = False
     if curses.has_colors():
         curses.start_color()
-        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK) # Default white on black
-        curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_WHITE) # Highlighted (black on white)
-        curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_BLACK) # Dim white on black (will be adjusted later)
+        curses.use_default_colors() # Use default terminal background
+
+        # Define color pairs
+        # Pair 1: Default text (white on default background, but let terminal handle default foreground)
+        curses.init_pair(1, curses.COLOR_WHITE, -1)
+        # Pair 2: Highlighted item (bold white text on a contrasting background, e.g., blue)
+        curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_CYAN)
+        # Pair 3: Dim text (gray on default background, or just normal if gray isn\'t distinct)
+        curses.init_pair(3, curses.COLOR_BLACK, -1) # Using black for \'dim\' on light default backgrounds
+
         curses_colors_enabled = True
 
+    # Define color attributes to be used with addstr
     DIM_COLOR = curses.color_pair(3)
-    BOLD_WHITE_COLOR = curses.A_BOLD | curses.color_pair(1)
-
-    parser = argparse.ArgumentParser(description="Aegis Authenticator CLI in Python.", prog="aegis-cli")
-    parser.add_argument("-v", "--vault-path", help="Path to the Aegis vault file. If not provided, attempts to find the latest in default locations.")
-    parser.add_argument("-d", "--vault-dir", help="Directory to search for vault files. Defaults to current directory.", default=".")
-    parser.add_argument("-u", "--uuid", help="Display OTP for a specific entry UUID.")
-    parser.add_argument("-g", "--group", help="Filter OTP entries by a specific group name.")
-    parser.add_argument("positional_vault_path", nargs="?", help=argparse.SUPPRESS, default=None)
-    parser.add_argument("--no-color", action="store_true", help="Disable colored output.")
-
-    args = parser.parse_args()
+    BOLD_WHITE_COLOR = curses.A_BOLD | curses.color_pair(1) # For revealed OTP, bold white on default background
+    HIGHLIGHT_COLOR = curses.color_pair(2) # For selected row in search mode
 
     config = load_config()
+
     
     # Override args.no_color if default_color_mode is false and --no-color is not explicitly set
     if not config["default_color_mode"] and not args.no_color:
@@ -109,20 +109,6 @@ def cli_main(stdscr):
         stdscr.addstr(row, 0, f"Found vault: {vault_path}")
         row += 1
         stdscr.refresh()
-
-    password = os.getenv("AEGIS_CLI_PASSWORD")
-    if not password:
-        try:
-            try:
-                password = getpass.getpass("Enter vault password: ")
-            except Exception:
-                stdscr.addstr(row, 0, "Warning: getpass failed. Falling back to insecure password input.")
-                row += 1
-                stdscr.refresh()
-                password = input("Enter vault password (will be echoed): ")
-        except (KeyboardInterrupt, EOFError):
-            print("\nExiting.")
-            return
 
     try:
         vault_data = read_and_decrypt_vault_file(vault_path, password)
@@ -164,10 +150,11 @@ def cli_main(stdscr):
         search_term = ""
         current_mode = "search" # Initialize mode
         selected_index_for_reveal = None # Initialize to None
-        selected_row = 0 # Track the currently highlighted row for navigation
+        selected_row = -1 # Track the currently highlighted row for navigation (-1 for no selection)
+        char = curses.ERR # Initialize char to prevent UnboundLocalError
         
         while True:
-            os.system("clear") # Clear the screen for each refresh
+            stdscr.clear() # Clear the screen for each refresh
             
             otps = get_otps(vault_data)
 
@@ -180,7 +167,7 @@ def cli_main(stdscr):
             group_names = {group.uuid: group.name for group in vault_data.db.groups}
 
             all_entries = []
-            for entry in vault_data.db.entries:
+            for idx, entry in enumerate(vault_data.db.entries): # Use enumerate to get the original index
                 resolved_groups = []
                 for group_uuid in entry.groups:
                     resolved_groups.append(group_names.get(group_uuid, group_uuid))
@@ -189,6 +176,7 @@ def cli_main(stdscr):
                     continue
 
                 all_entries.append({
+                    "index": idx, # Add the original index
                     "name": entry.name,
                     "issuer": entry.issuer if entry.issuer else "",
                     "groups": ", ".join(resolved_groups) if resolved_groups else "",
@@ -199,24 +187,34 @@ def cli_main(stdscr):
             # Sort alphabetically by issuer
             all_entries.sort(key=lambda x: x["issuer"].lower())
 
-            # Apply search filter
-            filtered_entries = []
-            for i, item in enumerate(all_entries):
-                item["index"] = i + 1 # Assign 1-based index
-                search_string_match = (
-                    search_term.lower() in item["name"].lower() or
-                    search_term.lower() in item["issuer"].lower() or
-                    search_term.lower() in item["groups"].lower() or
-                    search_term.lower() in item["note"].lower()
-                )
-                # Also allow searching by index number
-                if search_term.isdigit() and int(search_term) == item["index"]:
-                    search_string_match = True
+            # Display all entries, search will only move the cursor
+            display_data = all_entries
 
-                if not search_term or search_string_match:
-                    filtered_entries.append(item)
-            
-            display_data = filtered_entries
+            # Adjust selected_row based on search_term
+            if search_term:
+                found_match_in_search = False
+                for idx, entry in enumerate(all_entries):
+                    search_string = f"{entry['issuer']} {entry['name']} {entry['groups']} {entry['note']}".lower()
+                    if search_term.lower() in search_string:
+                        selected_row = idx
+                        found_match_in_search = True
+                        break
+                if not found_match_in_search and len(all_entries) > 0:
+                    # If current search_term doesn't match anything, keep previous selection if valid
+                    # Otherwise, if no entries, selected_row should be -1.
+                    pass # selected_row remains as is from previous iteration, or -1 if no entries
+                elif not all_entries: # If no entries at all
+                    selected_row = -1
+            elif not all_entries: # No search term and no entries
+                selected_row = -1
+            else: # No search term, but entries exist, default to first entry
+                selected_row = 0
+
+            # Ensure selected_row is always within the valid bounds of display_data (all_entries)
+            if len(display_data) > 0:
+                selected_row = max(0, min(selected_row, len(display_data) - 1))
+            else:
+                selected_row = -1
 
             for item in display_data:
                 if len(item["name"]) > max_name_len: max_name_len = len(item["name"])
@@ -228,18 +226,9 @@ def cli_main(stdscr):
             entry_to_reveal = None
 
             # Check if an entry was selected for reveal via Enter key
-            if selected_index_for_reveal is not None:
-                # Find the actual entry from filtered_entries using its original 'index' (1-based)
-                # which was stored in selected_index_for_reveal
-                for item in filtered_entries:
-                    if item["index"] == selected_index_for_reveal:
-                        entry_to_reveal = item
-                        break
-                selected_index_for_reveal = None # Reset after processing
+            if current_mode == "search" and selected_row != -1 and (char == curses.KEY_ENTER or char in [10, 13]):
+                entry_to_reveal = all_entries[selected_row]
 
-            # If no manual selection, check for auto-reveal (single match with non-empty search term)
-            elif len(filtered_entries) == 1 and current_mode == "search" and search_term:
-                entry_to_reveal = filtered_entries[0]
 
             if entry_to_reveal:
                 if entry_to_reveal["uuid"] not in revealed_otps:
@@ -251,12 +240,7 @@ def cli_main(stdscr):
                     pyperclip.copy(otp_to_copy)
                 # Reset selected_row after revealing
                 selected_row = 0
-            elif len(filtered_entries) != 1 and current_mode == "reveal":
-                # Automatically exit Reveal Mode if filter changes (e.g., search term deleted or new search)
-                revealed_otps.clear()
-                current_mode = "search"
-            elif len(filtered_entries) != 1 and len(revealed_otps) > 0: # This case is for search mode when filter changes
-                revealed_otps.clear()
+
 
             row = 0 # Reset row for each refresh
 
@@ -305,7 +289,7 @@ def cli_main(stdscr):
                     if uuid in revealed_otps:
                         attribute = BOLD_WHITE_COLOR
                     elif i == selected_row and current_mode == "search": # Highlight if selected in search mode
-                        attribute = curses.A_REVERSE | curses.color_pair(2) # Reverse video for highlight
+                        attribute = HIGHLIGHT_COLOR # Use the new HIGHLIGHT_COLOR
                     else:
                         attribute = DIM_COLOR
                 
@@ -320,28 +304,35 @@ def cli_main(stdscr):
 
                 char = stdscr.getch() # Get a single character
 
-                if char == curses.KEY_UP:
-                    selected_row = max(0, selected_row - 1)
-                elif char == curses.KEY_DOWN:
-                    selected_row = min(len(filtered_entries) - 1, selected_row + 1) # Use filtered_entries length
-                elif char == curses.KEY_ENTER or char in [10, 13]: # Enter key
-                    if 0 <= selected_row < len(filtered_entries):
-                        selected_index_for_reveal = filtered_entries[selected_row]["index"]
-                        # We don't clear search_term here, as the intent is to reveal the selected item
-                elif char == 27: # ESC key
-                    search_term = ""
-                    revealed_otps.clear()
-                    selected_row = 0
-                elif char in [curses.KEY_BACKSPACE, 127, 8]: # Backspace key
-                    search_term = search_term[:-1]
-                    selected_row = 0 # Reset selection on search change
-                elif 32 <= char < 127: # Printable character
-                    search_term += chr(char)
-                    selected_row = 0 # Reset selection on search change
-                elif char == 3: # Ctrl+C
-                    raise KeyboardInterrupt
-                
+                if char != curses.ERR: # Only process if a key was actually pressed
+                    if char == curses.KEY_UP:
+                        if len(all_entries) > 0:
+                            selected_row = max(0, selected_row - 1)
+                        else:
+                            selected_row = -1
+                    elif char == curses.KEY_DOWN:
+                        if len(all_entries) > 0:
+                            selected_row = min(len(all_entries) - 1, selected_row + 1)
+                        else:
+                            selected_row = -1
+
+                    elif char == 27: # ESC key
+                        search_term = ""
+                        revealed_otps.clear()
+                        selected_row = 0 if len(all_entries) > 0 else -1 # Reset selection
+                    elif char in [curses.KEY_BACKSPACE, 127, 8]: # Backspace key
+                        search_term = search_term[:-1]
+                        selected_row = 0 if len(all_entries) > 0 else -1 # Reset selection for new search term evaluation
+                    elif 32 <= char < 127: # Printable character
+                        search_term += chr(char)
+                        selected_row = 0 if len(all_entries) > 0 else -1 # Reset selection for new search term evaluation
+                    elif char == 3: # Ctrl+C
+                        raise KeyboardInterrupt
                 row += 1 # Advance row after input prompt
+            
+            # Add a small delay if no key was pressed to prevent CPU from spinning
+            if char == curses.ERR:
+                time.sleep(0.1)
 
             # Original "Search as you type" logic (retained for reference)
             if False: # Keep this block for historical reference, but it's currently disabled.
@@ -369,13 +360,14 @@ def cli_main(stdscr):
                 
             
             elif current_mode == "reveal" and len(display_data) == 1: # Ensure we are still in a valid reveal state
-                otp_to_reveal = otps[display_data[0]["uuid"]].string()
-                ttn = get_ttn()
-                initial_ttn_seconds = int(ttn / 1000)
-                
-                # Inner loop for responsive countdown
-                # Inner loop for responsive countdown
-                for remaining_seconds in range(initial_ttn_seconds, 0, -1):
+                # Get the actual time to next refresh
+                actual_ttn = get_ttn()
+
+                # Loop to keep OTP revealed until ESC is pressed
+                while True:
+                    current_remaining_ttn = get_ttn() # Get updated ttn in each iteration
+                    remaining_seconds_for_display = int(current_remaining_ttn / 1000)
+
                     if PYPERCLIP_AVAILABLE:
                         pyperclip.copy(otp_to_reveal)
                     stdscr.clear() # Clear for each countdown second
@@ -394,13 +386,27 @@ def cli_main(stdscr):
                     stdscr.addstr(countdown_row, 0, line, BOLD_WHITE_COLOR if curses_colors_enabled else curses.A_NORMAL)
                     countdown_row += 1
 
-                    countdown_text = f"Time until next refresh: {remaining_seconds:.1f} seconds (Press Ctrl+C to exit)"
+                    countdown_text = f"Time until next refresh: {remaining_seconds_for_display:.1f} seconds (Press ESC to go back)"
                     stdscr.addstr(countdown_row, 0, countdown_text, DIM_COLOR if curses_colors_enabled else curses.A_NORMAL)
                     
                     stdscr.refresh() # Refresh screen after all updates
-                    time.sleep(1) # Sleep for 1 second
 
-                # After countdown finishes
+                    # Set timeout for getch to allow for responsive exit
+                    stdscr.timeout(1000) # 1-second timeout for getch
+                    char = stdscr.getch()
+
+                    if char == 27 or char in [curses.KEY_BACKSPACE, 127, 8]: # ESC or Backspace key
+                        current_mode = "search"
+                        selected_index_for_reveal = None
+                        search_term = ""
+                        revealed_otps.clear()
+                        stdscr.timeout(-1) # Reset timeout to blocking
+                        break # Exit the reveal loop
+                    elif char == 3: # Ctrl+C
+                        raise KeyboardInterrupt
+                    # If other keys are pressed, or no key, getch will return ERR after 1 second
+
+                # After countdown finishes (either by ESC/Backspace or OTP expiration)
                 search_term = ""
                 revealed_otps.clear()
                 current_mode = "search"
@@ -410,4 +416,22 @@ def cli_main(stdscr):
         return
 
 if __name__ == "__main__":
-    curses.wrapper(cli_main)
+    parser = argparse.ArgumentParser(description="Aegis Authenticator CLI in Python.", prog="aegis-cli")
+    parser.add_argument("-v", "--vault-path", help="Path to the Aegis vault file. If not provided, attempts to find the latest in default locations.")
+    parser.add_argument("-d", "--vault-dir", help="Directory to search for vault files. Defaults to current directory.", default=".")
+    parser.add_argument("-u", "--uuid", help="Display OTP for a specific entry UUID.")
+    parser.add_argument("-g", "--group", help="Filter OTP entries by a specific group name.")
+    parser.add_argument("positional_vault_path", nargs="?", help=argparse.SUPPRESS, default=None)
+    parser.add_argument("--no-color", action="store_true", help="Disable colored output.")
+
+    args = parser.parse_args()
+
+    password = os.getenv("AEGIS_CLI_PASSWORD")
+    if not password:
+        try:
+            password = getpass.getpass("Enter vault password: ")
+        except (KeyboardInterrupt, EOFError):
+            print("\nExiting.")
+            sys.exit(0) # Exit cleanly
+
+    curses.wrapper(cli_main, args, password)

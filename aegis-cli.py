@@ -190,51 +190,104 @@ def cli_main(stdscr, args, password):
                         # Sort alphabetically by issuer
                         all_entries.sort(key=lambda x: x["issuer"].lower())
         
-                        # Display all entries, search will only move the cursor
-                        display_data = all_entries
+                                    # Display all entries, search will only move the cursor
+        
+                                    display_data = all_entries
+        
+                        
         
                                     # Adjust selected_row based on search_term
+        
                                     if search_term:
+        
                                         # Attempt to search by line number first
+        
                                         if search_term.isdigit():
+        
                                             line_number = int(search_term)
+        
                                             if 1 <= line_number <= len(all_entries):
+        
                                                 selected_row = line_number - 1
+        
                                                 previous_search_term = search_term # Update to prevent resetting
+        
                                                 # Skip text-based search if line number search is successful
+        
                                                 if len(display_data) > 0:
+        
                                                     selected_row = max(0, min(selected_row, len(display_data) - 1))
+        
                                                 else:
+        
                                                     selected_row = -1
-                                                continue # Skip remaining search logic and redraw
+        
+                                                # The 'continue' here is crucial to skip the rest of the search_term processing
+        
+                                                # and redraw the screen with the new selected_row
+        
+                                                # However, a 'continue' inside this block will skip to the next iteration of the outer while loop.
+        
+                                                # I should refactor to avoid 'continue' here directly and let the main loop iteration handle it.
+        
+                                                # For now, will adjust the logic below to handle the case where line number search is successful.
+        
+                                                line_number_search_successful = True
+        
+                                            else:
+        
+                                                line_number_search_successful = False
+        
+                                        else:
+        
+                                            line_number_search_successful = False
+        
                         
-                                        # If search term changed, re-evaluate selected_row to the first match
-                                        if search_term != previous_search_term:
+        
+                                        if not line_number_search_successful or search_term != previous_search_term: # Only perform text search if line number search failed or search term changed
+        
                                             found_match_in_search = False
+        
                                             for idx, entry in enumerate(all_entries):
+        
                                                 search_string = f"{entry['issuer']} {entry['name']} {entry['groups']} {entry['note']}".lower()
+        
                                                 if search_term.lower() in search_string:
+        
                                                     selected_row = idx
+        
                                                     found_match_in_search = True
+        
                                                     break
+        
                                             if not found_match_in_search and len(all_entries) > 0:
-                                                # If current search_term doesn't match anything, try to keep previous selection if valid
+        
                                                 if not (0 <= selected_row < len(all_entries)):
-                                                    selected_row = 0 # Default to first if previous invalid
-                                            elif not all_entries: # If no entries at all
+        
+                                                    selected_row = 0
+        
+                                            elif not all_entries:
+        
                                                 selected_row = -1
-                                        # If search term is the same, keep selected_row as is (potentially from arrow keys)
+        
                                     else: # No search term
+        
                                         if previous_search_term: # If search_term just became empty
+        
                                             selected_row = 0 if len(all_entries) > 0 else -1 # Reset to first or none
-                                        # If search_term was already empty, selected_row should be maintained by arrow keys
+        
                         
-                                    # Ensure selected_row is always within the valid bounds of display_data (all_entries)
+        
                                     if len(display_data) > 0:
+        
                                         selected_row = max(0, min(selected_row, len(display_data) - 1))
+        
                                     else:
+        
                                         selected_row = -1
+        
                         
+        
                                     previous_search_term = search_term # Update previous search term for next iteration            for item in display_data:
                 if len(item["name"]) > max_name_len: max_name_len = len(item["name"])
                 if len(item["issuer"]) > max_issuer_len: max_issuer_len = len(item["issuer"])

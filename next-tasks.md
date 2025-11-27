@@ -1,3 +1,4 @@
 - **Color countdown (less than 10s red):** Implement visual cue for OTP countdown when less than 10 seconds remaining.
 - **Interactive Group Filtering (Ctrl+G):** Add interactive functionality to filter by group using `Ctrl+G` key press, leveraging existing search filter function to select a group, then displaying only relevant entries.
+- **Fix flickering when pressing up and down arrows - The entire screen redraws causing a flicker.
 - **Enhanced Clipboard Integration and User Feedback:** Refine clipboard functionality to include configurable clipboard tools (e.g., for Xorg/Wayland via `config.json`) and display the message "Press <Enter> to copy the OTP code to the clipboard." when an item is revealed. This message should only appear if a clipboard tool is configured.

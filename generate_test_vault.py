@@ -107,39 +107,75 @@ def generate_random_base32_secret(length: int = 16) -> str:
     random_bytes = os.urandom(length)
     return base64.b32encode(random_bytes).decode('utf-8').rstrip('=')
 
-def generate_random_string(length: int = 10) -> str:
-    import random
-    import string
-    characters = string.ascii_letters + string.digits
-    return ''.join(random.choice(characters) for i in range(length))
-# --- End of helper functions ---
+# --- Predefined lists for realistic data ---
+COMMON_ISSUERS = ["Google", "GitHub", "Amazon", "Facebook", "Microsoft", "Discord", "Twitch", "Twitter", "WorkCo", "Personal Bank"]
+COMMON_NAMES = ["Primary", "Secondary", "Backup", "Admin", "Gaming", "Shopping", "Personal", "Work"]
+COMMON_GROUPS = ["Social Media", "Work Accounts", "Financial", "Personal", "Development", "Gaming"]
+COMMON_NOTES = [
+    "Used for everyday login.",
+    "Backup account for recovery.",
+    "High security, requires frequent updates.",
+    "Linked to personal email.",
+    "For development purposes only.",
+    "Shopping account, low priority.",
+    "Main account for all services.",
+    "Temporary access token.",
+    "Shared with team for project X.",
+    "Access to sensitive data."
+]
+COMMON_ALGOS = ["SHA1", "SHA256", "SHA512"]
+COMMON_DIGITS = [6, 8]
+COMMON_PERIODS = [30, 60]
 
 # --- Functions to construct dataclasses ---
-def create_random_info() -> Info:
-    return Info(
-        secret=generate_random_base32_secret(),
-        algo="SHA1", # SHA1
-        digits=6,
-        period=30,
-        counter=0
-    )
+def create_realistic_info(is_hotp: bool = False) -> Info:
+    if is_hotp:
+        return Info(
+            secret=generate_random_base32_secret(),
+            algo=random.choice(COMMON_ALGOS),
+            digits=random.choice(COMMON_DIGITS),
+            counter=random.randint(1, 1000) # For HOTP
+        )
+    else:
+        return Info(
+            secret=generate_random_base32_secret(),
+            algo=random.choice(COMMON_ALGOS),
+            digits=random.choice(COMMON_DIGITS),
+            period=random.choice(COMMON_PERIODS),
+        )
 
-def create_random_group() -> Group:
+def create_realistic_group() -> Group:
     return Group(
         uuid=generate_random_uuid(),
-        name=generate_random_string(8),
-        note=generate_random_string(20)
+        name=random.choice(COMMON_GROUPS),
+        note=random.choice(COMMON_NOTES)
     )
 
-def create_random_entry(groups_uuids: List[str]) -> Entry:
+def create_realistic_entry(groups_uuids: List[str]) -> Entry:
+    issuer = random.choice(COMMON_ISSUERS)
+    name = random.choice(COMMON_NAMES)
+    
+    # Combine issuer and name for more unique entries sometimes
+    if random.random() < 0.3: # 30% chance to combine
+        name = f"{issuer} {name}"
+
+    is_hotp = random.random() < 0.1 # 10% chance to be HOTP
+    entry_type = "hotp" if is_hotp else "totp"
+
+    assigned_groups = []
+    if groups_uuids and random.random() < 0.8: # 80% chance to assign to a group
+        num_assigned_groups = random.randint(1, min(len(groups_uuids), 2)) # Assign to 1 or 2 groups
+        assigned_groups = random.sample(groups_uuids, num_assigned_groups)
+
     return Entry(
-        type="totp", # Added 'type' field
+        type=entry_type,
         uuid=generate_random_uuid(),
-        name=generate_random_string(12),
-        issuer=generate_random_string(10),
-        note=generate_random_string(25),
-        info=create_random_info(),
-        groups=[random.choice(groups_uuids)] if groups_uuids else []
+        name=name,
+        issuer=issuer,
+        note=random.choice(COMMON_NOTES),
+        favorite=random.random() < 0.2, # 20% chance to be a favorite
+        info=create_realistic_info(is_hotp=is_hotp),
+        groups=assigned_groups
     )
 # --- End of dataclass construction functions ---
 
@@ -234,12 +270,12 @@ def main():
     print(f"Generating a test vault with {args.num_entries} entries at {args.output_path}...")
 
     # Generate groups
-    num_groups = max(1, args.num_entries // 5) # Create at least 1 group, up to num_entries/5
-    groups = [create_random_group() for _ in range(num_groups)]
+    num_groups = max(1, args.num_entries // 5)
+    groups = [create_realistic_group() for _ in range(num_groups)]
     group_uuids = [g.uuid for g in groups]
 
     # Generate entries
-    entries = [create_random_entry(group_uuids) for _ in range(args.num_entries)]
+    entries = [create_realistic_entry(group_uuids) for _ in range(args.num_entries)]
 
     # Create Db object
     db = Db(

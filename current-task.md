@@ -34,6 +34,9 @@ We are now implementing a `ncurses`-based TUI to provide a more intuitive select
 *   **`TypeError: string indices must be integers, not 'str'` during vault decryption:**
     *   **Finding:** Vault decryption failed due to a structural mismatch in `generate_test_vault.py` and incorrect encoding for cryptographic fields.
     *   **Mitigation:** Updated dataclass definitions and encoding/decoding methods in `generate_test_vault.py` to align with `vault.py`, and regenerated `test_vault.json`.
+*   **`NameError: name 'display_data' is not defined. Did you mean: 'display_list'?` (multiple occurrences):**
+    *   **Finding:** In the reveal mode, `display_data` was referenced instead of `display_list`.
+    *   **Mitigation:** Replaced all instances of `display_data` with `display_list` in the reveal mode logic.
 *   **`termios.error: (25, 'Inappropriate ioctl for device')`:**
     *   **Finding:** Occurred in non-interactive environments when `aegis-tui.py` attempted interactive terminal operations.
     *   **Mitigation:** Acknowledged as an expected environmental limitation; no code changes were made.
@@ -61,9 +64,15 @@ We are now implementing a `ncurses`-based TUI to provide a more intuitive select
 *   **Arrow key highlighting and general `ncurses` TUI issues:**
     *   **Finding:** Double highlighting, screen blinking, disappearing list, limited OTP reveal duration, and non-standard color theme.
     *   **Mitigation:** Removed `stdscr.timeout(100)` to make `stdscr.getch()` blocking, refined `selected_row` management, modified OTP reveal to persist until `ESC`, used `curses.use_default_colors()`, and defined a new `HIGHLIGHT_COLOR`.
+*   **Group Filtering Implementation:**
+    *   **Progress:** Initial implementation for group filtering via Ctrl+G is complete.
+    *   **Fixed:**
+        *   Corrected `NameError: name 'display_data' is not defined` (multiple occurrences).
+        *   Added "All OTPs" option to group selection, allowing users to clear the group filter.
+        *   Resolved issues where the filtered group list lacked a highlighted selection and OTPs were unexpectedly revealed, by ensuring `revealed_otps` is cleared on mode change and group selection, and explicitly setting `current_mode = "search"` after group selection.
+        *   Implemented dark blue border highlighting for the revealed OTP code.
 
 ## Next Steps
-1.  Implement group filtering via Ctrl+G.
-2.  Update unit tests to cover new TUI interactions (acknowledging environmental limitations).
-3.  Clean up: Remove temporary `test_ncurses.py` file (if it still exists).
-4.  Commit and push changes.
+1.  Update unit tests to cover new TUI interactions (acknowledging environmental limitations).
+2.  Clean up: Remove temporary `test_ncurses.py` file (if it still exists).
+3.  Commit and push changes.

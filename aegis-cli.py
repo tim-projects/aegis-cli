@@ -155,8 +155,7 @@ def cli_main(stdscr, args, password):
         selected_row = -1 # Track the currently highlighted row for navigation (-1 for no selection)
         char = curses.ERR # Initialize char to prevent UnboundLocalError
         previous_search_term = "" # Track previous search term to detect changes
-        
-                while True:
+        while True:
                     stdscr.clear() # Clear the screen for each refresh
                     
                     otps = get_otps(vault_data)

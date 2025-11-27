@@ -233,7 +233,7 @@ def cli_main(stdscr, args, password):
                     else:
                         selected_row = -1
         
-                                previous_search_term = search_term # Update previous search term for next iteration
+            previous_search_term = search_term # Update previous search term for next iteration
                     
                                 for item in display_data:
                                     if len(item["name"]) > max_name_len: max_name_len = len(item["name"])

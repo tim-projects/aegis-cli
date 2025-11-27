@@ -233,203 +233,204 @@ def cli_main(stdscr, args, password):
                     else:
                         selected_row = -1
         
-                    previous_search_term = search_term # Update previous search term for next iteration            for item in display_data:
-                        if len(item["name"]) > max_name_len: max_name_len = len(item["name"])
-                        if len(item["issuer"]) > max_issuer_len: max_issuer_len = len(item["issuer"])
-                        if len(item["groups"]) > max_group_len: max_group_len = len(item["groups"])
-                        if len(item["note"]) > max_note_len: max_note_len = len(item["note"])
-        
-                    # --- Mode Management & Display ---
-                    entry_to_reveal = None
-        
-                    # Check if an entry was selected for reveal via Enter key
-                    if current_mode == "search" and selected_row != -1 and (char == curses.KEY_ENTER or char in [10, 13]):
-                        entry_to_reveal = all_entries[selected_row]
-        
-        
-                    if entry_to_reveal:
-                        if entry_to_reveal["uuid"] not in revealed_otps:
-                            revealed_otps.add(entry_to_reveal["uuid"])
-                        current_mode = "reveal"
-                        # Auto-copy logic (already exists and uses PYPERCLIP_AVAILABLE)
-                        if PYPERCLIP_AVAILABLE:
-                            otp_to_copy = otps[entry_to_reveal["uuid"]].string()
-                            pyperclip.copy(otp_to_copy)
-                        # Reset selected_row after revealing
-                        selected_row = 0
-        
-        
-                    row = 0 # Reset row for each refresh
-        
-                    # Print header based on mode and search
-                    if current_mode == "search":
-                        if not search_term and not args.group:
-                            stdscr.addstr(row, 0, "--- All OTPs ---")
-                        elif args.group:
-                            stdscr.addstr(row, 0, f"--- Group: {args.group} ---")
-                        else:
-                            stdscr.addstr(row, 0, f"--- Search: {search_term} ---")
-                    elif current_mode == "reveal" and len(display_data) == 1:
-                         stdscr.addstr(row, 0, f"--- Revealed OTP: {display_data[0]['name']} ---")
-                    row += 1
-        
-        
-        
-                    # Print header for table
-                    stdscr.addstr(row, 0, f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}")
-                    row += 1
-                    stdscr.addstr(row, 0, f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}")
-                    row += 1
-        
-                    # Print formatted output
-                    for i, item in enumerate(display_data): # Use enumerate to get the index for highlighting
-                        index = item["index"]
-                        name = item["name"]
-                        issuer = item["issuer"]
-                        groups = item["groups"]
-                        note = item["note"]
-                        uuid = item["uuid"]
-        
-                        otp_value = "******" # Obscure by default
-                        if uuid in otps and uuid in revealed_otps:
-                            try:
-                                otp_obj = otps[uuid]
-                                otp_value = otp_obj.string()
-                            except Exception as e:
-                                otp_value = f"ERROR: {e}"
-                        
-                        line = f"{str(i + 1).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
-        
-                        # Determine color attribute
-                        attribute = curses.A_NORMAL
-                        if curses_colors_enabled:
-                            if uuid in revealed_otps:
-                                attribute = BOLD_WHITE_COLOR
-                            elif i == selected_row and current_mode == "search": # Highlight if selected in search mode
-                                attribute = HIGHLIGHT_COLOR # Use the new HIGHLIGHT_COLOR
-                            else:
-                                attribute = curses.A_NORMAL # Use standard terminal attributes for unhighlighted items
-                        
-                        stdscr.addstr(row, 0, line, attribute)
-                        row += 1
-                    stdscr.refresh()
-        
-                    # --- Input Handling for "Search" Mode with Arrow Key Navigation ---
-                    if current_mode == "search":
-                        stdscr.addstr(row, 0, f"Type to filter, use arrows to select, Enter to reveal (Ctrl+C to exit): {search_term}")
-                        stdscr.refresh()
-        
-                        char = stdscr.getch() # Get a single character
-        
-                        if char != curses.ERR: # Only process if a key was actually pressed
-                            if char == curses.KEY_UP:
-                                if len(all_entries) > 0:
-                                    selected_row = max(0, selected_row - 1)
-                                else:
-                                    selected_row = -1
-                            elif char == curses.KEY_DOWN:
-                                if len(all_entries) > 0:
-                                    selected_row = min(len(all_entries) - 1, selected_row + 1)
-                                else:
-                                    selected_row = -1
-        
-                            elif char == 27: # ESC key
-                                search_term = ""
-                                revealed_otps.clear()
-                                selected_row = 0 if len(all_entries) > 0 else -1 # Reset selection
-                            elif char in [curses.KEY_BACKSPACE, 127, 8]: # Backspace key
-                                if search_term: # Only modify search_term if it's not empty
-                                    search_term = search_term[:-1]
-                                    selected_row = 0 if len(all_entries) > 0 else -1 # Reset selection for new search term evaluation
-                            elif 32 <= char < 127: # Printable character
-                                search_term += chr(char)
-                                selected_row = 0 if len(all_entries) > 0 else -1 # Reset selection for new search term evaluation
-                            elif char == 3: # Ctrl+C
-                                raise KeyboardInterrupt
-                        row += 1 # Advance row after input prompt
+                                previous_search_term = search_term # Update previous search term for next iteration
                     
-                    # Add a small delay if no key was pressed to prevent CPU from spinning
-                    if char == curses.ERR:
-                        time.sleep(0.1)
-        
-                    # Original "Search as you type" logic (retained for reference)
-                    if False: # Keep this block for historical reference, but it's currently disabled.
-                        key = None
-                        if select.select([sys.stdin], [], [], 0.1)[0]: # Check for input with a short timeout
-                            key = readchar.readkey() # Read key if input is available
-        
-                        if key: # Process key if one was pressed
-                            if key == readchar.key.BACKSPACE:
-                                search_term = search_term[:-1]
-                            elif key == readchar.key.CTRL_C:
-                                raise KeyboardInterrupt
-                            elif key == readchar.key.ESC:
-                                search_term = ""
-                                revealed_otps.clear()
-                            elif key == readchar.key.ENTER:
-                                pass # Enter key is ignored in search mode, as automatic revelation handles it.
-                            else:
-                                search_term += key
-                            
-                        # Display the prompt *after* processing any new key
-                        print(f"\nType the name or line number to reveal OTP code (Ctrl+C to exit): {search_term}", end='', flush=True)
-                        time.sleep(0.1) # Add a small delay to prevent rapid blinking and allow user to type
-        
-                        
-                    elif current_mode == "reveal": # Ensure we are still in a valid reveal state
-                        if not entry_to_reveal: # If we are in reveal mode but no entry was revealed, it's an error state
-                            current_mode = "search"
-                            continue # Go back to search
-                        otp_to_reveal = otps[entry_to_reveal["uuid"]].string() # Define otp_to_reveal here
-                        # Get the actual time to next refresh
-                        actual_ttn = get_ttn()
-        
-                        # Loop to keep OTP revealed until ESC is pressed
-                        while True:
-                            current_remaining_ttn = get_ttn() # Get updated ttn in each iteration
-                            remaining_seconds_for_display = int(current_remaining_ttn / 1000)
-        
-                            if PYPERCLIP_AVAILABLE:
-                                pyperclip.copy(otp_to_reveal)
-                            stdscr.clear() # Clear for each countdown second
-                            
-                            countdown_row = 0 # Local row counter for reveal mode
-                            stdscr.addstr(countdown_row, 0, f"--- Revealed OTP: {display_data[0]['name']} ---")
-                            countdown_row += 1
-                            
-                            stdscr.addstr(countdown_row, 0, f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}")
-                            countdown_row += 1
-                            stdscr.addstr(countdown_row, 0, f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}")
-                            countdown_row += 1
-                            
-                            item = display_data[0]
-                            line = f"{str(item['index']).ljust(3)} {item['issuer'].ljust(max_issuer_len)}  {item['name'].ljust(max_name_len)}  {otp_to_reveal.ljust(6)}  {item['groups'].ljust(max_group_len)}  {item['note'].ljust(max_note_len)}"
-                            stdscr.addstr(countdown_row, 0, line, BOLD_WHITE_COLOR if curses_colors_enabled else curses.A_NORMAL)
-                            countdown_row += 1
-        
-                            countdown_text = f"Time until next refresh: {remaining_seconds_for_display:.1f} seconds (Press ESC to go back)"
-                            stdscr.addstr(countdown_row, 0, countdown_text, DIM_COLOR if curses_colors_enabled else curses.A_NORMAL)
-                            
-                            stdscr.refresh() # Refresh screen after all updates
-        
-                            # Set timeout for getch to allow for responsive exit
-                            stdscr.timeout(1000) # 1-second timeout for getch
-                            char = stdscr.getch()
-        
-                            if char == 27 or char in [curses.KEY_BACKSPACE, 127, 8]: # ESC or Backspace key
-                                current_mode = "search"
-                                selected_index_for_reveal = None
-                                break # Exit the reveal loop
-                            elif char == 3: # Ctrl+C
-                                raise KeyboardInterrupt
-                            # If other keys are pressed, or no key, getch will return ERR after 1 second
-        
-                        # After countdown finishes (either by ESC/Backspace or OTP expiration)
-                        stdscr.timeout(-1) # Reset timeout to blocking upon exiting reveal loop
-                        current_mode = "search"
-                        search_term = ""
-                        revealed_otps.clear()                    
-    except KeyboardInterrupt:
+                                for item in display_data:
+                                    if len(item["name"]) > max_name_len: max_name_len = len(item["name"])
+                                    if len(item["issuer"]) > max_issuer_len: max_issuer_len = len(item["issuer"])
+                                    if len(item["groups"]) > max_group_len: max_group_len = len(item["groups"])
+                                    if len(item["note"]) > max_note_len: max_note_len = len(item["note"])
+                    
+                                # --- Mode Management & Display ---
+                                entry_to_reveal = None
+                    
+                                # Check if an entry was selected for reveal via Enter key
+                                if current_mode == "search" and selected_row != -1 and (char == curses.KEY_ENTER or char in [10, 13]):
+                                    entry_to_reveal = all_entries[selected_row]
+                    
+                    
+                                if entry_to_reveal:
+                                    if entry_to_reveal["uuid"] not in revealed_otps:
+                                        revealed_otps.add(entry_to_reveal["uuid"])
+                                    current_mode = "reveal"
+                                    # Auto-copy logic (already exists and uses PYPERCLIP_AVAILABLE)
+                                    if PYPERCLIP_AVAILABLE:
+                                        otp_to_copy = otps[entry_to_reveal["uuid"]].string()
+                                        pyperclip.copy(otp_to_copy)
+                                    # Reset selected_row after revealing
+                                    selected_row = 0
+                    
+                    
+                                row = 0 # Reset row for each refresh
+                    
+                                # Print header based on mode and search
+                                if current_mode == "search":
+                                    if not search_term and not args.group:
+                                        stdscr.addstr(row, 0, "--- All OTPs ---")
+                                    elif args.group:
+                                        stdscr.addstr(row, 0, f"--- Group: {args.group} ---")
+                                    else:
+                                        stdscr.addstr(row, 0, f"--- Search: {search_term} ---")
+                                elif current_mode == "reveal" and len(display_data) == 1:
+                                     stdscr.addstr(row, 0, f"--- Revealed OTP: {display_data[0]['name']} ---")
+                                row += 1
+                    
+                    
+                    
+                                # Print header for table
+                                stdscr.addstr(row, 0, f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}")
+                                row += 1
+                                stdscr.addstr(row, 0, f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}")
+                                row += 1
+                    
+                                # Print formatted output
+                                for i, item in enumerate(display_data): # Use enumerate to get the index for highlighting
+                                    index = item["index"]
+                                    name = item["name"]
+                                    issuer = item["issuer"]
+                                    groups = item["groups"]
+                                    note = item["note"]
+                                    uuid = item["uuid"]
+                    
+                                    otp_value = "******" # Obscure by default
+                                    if uuid in otps and uuid in revealed_otps:
+                                        try:
+                                            otp_obj = otps[uuid]
+                                            otp_value = otp_obj.string()
+                                        except Exception as e:
+                                            otp_value = f"ERROR: {e}"
+                                    
+                                    line = f"{str(i + 1).ljust(3)} {issuer.ljust(max_issuer_len)}  {name.ljust(max_name_len)}  {otp_value.ljust(6)}  {groups.ljust(max_group_len)}  {note.ljust(max_note_len)}"
+                    
+                                    # Determine color attribute
+                                    attribute = curses.A_NORMAL
+                                    if curses_colors_enabled:
+                                        if uuid in revealed_otps:
+                                            attribute = BOLD_WHITE_COLOR
+                                        elif i == selected_row and current_mode == "search": # Highlight if selected in search mode
+                                            attribute = HIGHLIGHT_COLOR # Use the new HIGHLIGHT_COLOR
+                                        else:
+                                            attribute = curses.A_NORMAL # Use standard terminal attributes for unhighlighted items
+                                    
+                                    stdscr.addstr(row, 0, line, attribute)
+                                    row += 1
+                                stdscr.refresh()
+                    
+                                # --- Input Handling for "Search" Mode with Arrow Key Navigation ---
+                                if current_mode == "search":
+                                    stdscr.addstr(row, 0, f"Type to filter, use arrows to select, Enter to reveal (Ctrl+C to exit): {search_term}")
+                                    stdscr.refresh()
+                    
+                                    char = stdscr.getch() # Get a single character
+                    
+                                    if char != curses.ERR: # Only process if a key was actually pressed
+                                        if char == curses.KEY_UP:
+                                            if len(all_entries) > 0:
+                                                selected_row = max(0, selected_row - 1)
+                                            else:
+                                                selected_row = -1
+                                        elif char == curses.KEY_DOWN:
+                                            if len(all_entries) > 0:
+                                                selected_row = min(len(all_entries) - 1, selected_row + 1)
+                                            else:
+                                                selected_row = -1
+                    
+                                        elif char == 27: # ESC key
+                                            search_term = ""
+                                            revealed_otps.clear()
+                                            selected_row = 0 if len(all_entries) > 0 else -1 # Reset selection
+                                        elif char in [curses.KEY_BACKSPACE, 127, 8]: # Backspace key
+                                            if search_term: # Only modify search_term if it's not empty
+                                                search_term = search_term[:-1]
+                                                selected_row = 0 if len(all_entries) > 0 else -1 # Reset selection for new search term evaluation
+                                        elif 32 <= char < 127: # Printable character
+                                            search_term += chr(char)
+                                            selected_row = 0 if len(all_entries) > 0 else -1 # Reset selection for new search term evaluation
+                                        elif char == 3: # Ctrl+C
+                                            raise KeyboardInterrupt
+                                    row += 1 # Advance row after input prompt
+                                
+                                # Add a small delay if no key was pressed to prevent CPU from spinning
+                                if char == curses.ERR:
+                                    time.sleep(0.1)
+                    
+                                # Original "Search as you type" logic (retained for reference)
+                                if False: # Keep this block for historical reference, but it's currently disabled.
+                                    key = None
+                                    if select.select([sys.stdin], [], [], 0.1)[0]: # Check for input with a short timeout
+                                        key = readchar.readkey() # Read key if input is available
+                    
+                                    if key: # Process key if one was pressed
+                                        if key == readchar.key.BACKSPACE:
+                                            search_term = search_term[:-1]
+                                        elif key == readchar.key.CTRL_C:
+                                            raise KeyboardInterrupt
+                                        elif key == readchar.key.ESC:
+                                            search_term = ""
+                                            revealed_otps.clear()
+                                        elif key == readchar.key.ENTER:
+                                            pass # Enter key is ignored in search mode, as automatic revelation handles it.
+                                        else:
+                                            search_term += key
+                                        
+                                    # Display the prompt *after* processing any new key
+                                    print(f"\nType the name or line number to reveal OTP code (Ctrl+C to exit): {search_term}", end='', flush=True)
+                                    time.sleep(0.1) # Add a small delay to prevent rapid blinking and allow user to type
+                    
+                                    
+                                elif current_mode == "reveal": # Ensure we are still in a valid reveal state
+                                    if not entry_to_reveal: # If we are in reveal mode but no entry was revealed, it's an error state
+                                        current_mode = "search"
+                                        continue # Go back to search
+                                    otp_to_reveal = otps[entry_to_reveal["uuid"]].string() # Define otp_to_reveal here
+                                    # Get the actual time to next refresh
+                                    actual_ttn = get_ttn()
+                    
+                                    # Loop to keep OTP revealed until ESC is pressed
+                                    while True:
+                                        current_remaining_ttn = get_ttn() # Get updated ttn in each iteration
+                                        remaining_seconds_for_display = int(current_remaining_ttn / 1000)
+                    
+                                        if PYPERCLIP_AVAILABLE:
+                                            pyperclip.copy(otp_to_reveal)
+                                        stdscr.clear() # Clear for each countdown second
+                                        
+                                        countdown_row = 0 # Local row counter for reveal mode
+                                        stdscr.addstr(countdown_row, 0, f"--- Revealed OTP: {display_data[0]['name']} ---")
+                                        countdown_row += 1
+                                        
+                                        stdscr.addstr(countdown_row, 0, f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}")
+                                        countdown_row += 1
+                                        stdscr.addstr(countdown_row, 0, f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}")
+                                        countdown_row += 1
+                                        
+                                        item = display_data[0]
+                                        line = f"{str(item['index']).ljust(3)} {item['issuer'].ljust(max_issuer_len)}  {item['name'].ljust(max_name_len)}  {otp_to_reveal.ljust(6)}  {item['groups'].ljust(max_group_len)}  {item['note'].ljust(max_note_len)}"
+                                        stdscr.addstr(countdown_row, 0, line, BOLD_WHITE_COLOR if curses_colors_enabled else curses.A_NORMAL)
+                                        countdown_row += 1
+                    
+                                        countdown_text = f"Time until next refresh: {remaining_seconds_for_display:.1f} seconds (Press ESC to go back)"
+                                        stdscr.addstr(countdown_row, 0, countdown_text, DIM_COLOR if curses_colors_enabled else curses.A_NORMAL)
+                                        
+                                        stdscr.refresh() # Refresh screen after all updates
+                    
+                                        # Set timeout for getch to allow for responsive exit
+                                        stdscr.timeout(1000) # 1-second timeout for getch
+                                        char = stdscr.getch()
+                    
+                                        if char == 27 or char in [curses.KEY_BACKSPACE, 127, 8]: # ESC or Backspace key
+                                            current_mode = "search"
+                                            selected_index_for_reveal = None
+                                            break # Exit the reveal loop
+                                        elif char == 3: # Ctrl+C
+                                            raise KeyboardInterrupt
+                                        # If other keys are pressed, or no key, getch will return ERR after 1 second
+                    
+                                    # After countdown finishes (either by ESC/Backspace or OTP expiration)
+                                    stdscr.timeout(-1) # Reset timeout to blocking upon exiting reveal loop
+                                    current_mode = "search"
+                                    search_term = ""
+                                    revealed_otps.clear()    except KeyboardInterrupt:
         print("\nExiting.")
         return
 

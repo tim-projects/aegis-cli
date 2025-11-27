@@ -10,6 +10,29 @@ We are now implementing a `ncurses`-based TUI to provide a more intuitive select
 *   **`_curses.error: cbreak() returned ERR` and `_curses.error: nocbreak() returned ERR`:**
     *   **Finding:** These errors occurred during automated execution of `aegis-tui.py`, indicating issues with `cbreak` mode setup and teardown within `curses.wrapper`.
     *   **Mitigation:** This is an environmental limitation of the non-interactive shell used for automated execution, as `curses` applications require a fully interactive terminal. This issue cannot be resolved by code changes within the application or tests.
+*   **`termios.error: (25, 'Inappropriate ioctl for device')`:**
+    *   **Finding:** Occurred in non-interactive environments when `aegis-tui.py` attempted interactive terminal operations.
+    *   **Mitigation:** Acknowledged as an expected environmental limitation; no code changes were made.
+*   **`Killed` error during `pytest` execution:**
+    *   **Finding:** Tests were crashing due to excessive memory usage with `MagicMock(spec=...)`.
+    *   **Mitigation:** Removed `spec=Entry` and `spec=OTP` from `MagicMock` instances in unit tests.
+*   **`io.UnsupportedOperation: redirected stdin is pseudofile, has no fileno()` in unit tests:**
+    *   **Finding:** `select.select` calls failed when `sys.stdin` was mocked as `StringIO`.
+    *   **Mitigation:** Patched `select.select` in unit tests to simulate input availability.
+*   **`Unhighlighted items not using standard terminal colors/bolding`:**
+    *   **Finding:** Unhighlighted items are currently not using the standard terminal's default colors and are not unbolded as expected, leading to an inconsistent visual appearance.
+    *   **Mitigation:** To be implemented.
+*   **`Arrow key navigation not working in Search Mode`:**
+    *   **Finding:** Pressing `curses.KEY_UP` and `curses.KEY_DOWN` does not change the `selected_row` as expected, preventing proper navigation of the list.
+    *   **Mitigation:** To be implemented.
+*   **`ESC key not working in Reveal Mode`:**
+    *   **Finding:** Pressing `ESC` (char 27) in reveal mode does not exit the reveal loop and return to search mode.
+    *   **Mitigation:** To be implemented.
+*   **`Border box not appearing in group selection and reveal modes`:**
+    *   **Finding:** The manually drawn border box, implemented in the previous step, only appears correctly in search mode, but not when in group selection or reveal modes.
+    *   **Mitigation:** To be investigated and fixed. This likely involves ensuring `box_start_row`, `box_start_col`, `box_height`, and `box_width` are correctly calculated and the drawing logic is consistently applied in all relevant modes.
+
+## Completed Tasks & Mitigations
 *   **`UnboundLocalError: cannot access local variable 'char'`:**
     *   **Finding:** The `char` variable was being used in a conditional statement before it was guaranteed to be assigned a value from `stdscr.getch()`.
     *   **Mitigation:** Initialized `char = curses.ERR` at the beginning of the `cli_main` function to ensure it always has a value.
@@ -37,30 +60,12 @@ We are now implementing a `ncurses`-based TUI to provide a more intuitive select
 *   **`NameError: name 'display_data' is not defined. Did you mean: 'display_list'?` (multiple occurrences):**
     *   **Finding:** In the reveal mode, `display_data` was referenced instead of `display_list`.
     *   **Mitigation:** Replaced all instances of `display_data` with `display_list` in the reveal mode logic.
-*   **`termios.error: (25, 'Inappropriate ioctl for device')`:**
-    *   **Finding:** Occurred in non-interactive environments when `aegis-tui.py` attempted interactive terminal operations.
-    *   **Mitigation:** Acknowledged as an expected environmental limitation; no code changes were made.
-*   **`Killed` error during `pytest` execution:**
-    *   **Finding:** Tests were crashing due to excessive memory usage with `MagicMock(spec=...)`.
-    *   **Mitigation:** Removed `spec=Entry` and `spec=OTP` from `MagicMock` instances in unit tests.
-*   **`io.UnsupportedOperation: redirected stdin is pseudofile, has no fileno()` in unit tests:**
-    *   **Finding:** `select.select` calls failed when `sys.stdin` was mocked as `StringIO`.
-    *   **Mitigation:** Patched `select.select` in unit tests to simulate input availability.
 *   **`AssertionError: 'Nomatch' not found in ...` (incorrect reveal behavior):**
     *   **Finding:** The application was incorrectly transitioning to "reveal" mode when the search term was empty and only one OTP entry existed, even if that entry didn't match.
     *   **Mitigation:** Modified the condition for entering "reveal" mode to require a non-empty `search_term` in addition to having a single matching entry.
 *   **Rapid blinking of prompt and filtering issues:**
     *   **Finding:** Rapid screen clearing and unresponsive filtering due to fast loop cycles and `search_term` not updating before display.
     *   **Mitigation:** Reordered input processing, ensuring `search_term` update before display, and added `time.sleep(0.1)` in search mode for stability.
-*   **Unhighlighted items not using standard terminal colors/bolding:**
-    *   **Finding:** Unhighlighted items are currently not using the standard terminal's default colors and are not unbolded as expected, leading to an inconsistent visual appearance.
-    *   **Mitigation:** To be implemented.
-*   **Arrow key navigation not working in Search Mode:**
-    *   **Finding:** Pressing `curses.KEY_UP` and `curses.KEY_DOWN` does not change the `selected_row` as expected, preventing proper navigation of the list.
-    *   **Mitigation:** To be implemented.
-*   **ESC key not working in Reveal Mode:**
-    *   **Finding:** Pressing `ESC` (char 27) in reveal mode does not exit the reveal loop and return to search mode.
-    *   **Mitigation:** To be implemented.
 *   **Arrow key highlighting and general `ncurses` TUI issues:**
     *   **Finding:** Double highlighting, screen blinking, disappearing list, limited OTP reveal duration, and non-standard color theme.
     *   **Mitigation:** Removed `stdscr.timeout(100)` to make `stdscr.getch()` blocking, refined `selected_row` management, modified OTP reveal to persist until `ESC`, used `curses.use_default_colors()`, and defined a new `HIGHLIGHT_COLOR`.
@@ -71,8 +76,11 @@ We are now implementing a `ncurses`-based TUI to provide a more intuitive select
         *   Added "All OTPs" option to group selection, allowing users to clear the group filter.
         *   Resolved issues where the filtered group list lacked a highlighted selection and OTPs were unexpectedly revealed, by ensuring `revealed_otps` is cleared on mode change and group selection, and explicitly setting `current_mode = "search"` after group selection.
         *   Implemented dark blue border highlighting for the revealed OTP code.
+*   **Border box for OTP list, group list, and reveal mode:**
+    *   **Progress:** Manually drawing the box now, resolving `TypeError`.
+    *   **Fixed:** Previously used `stdscr.box()` resulted in `TypeError`. The border is now manually drawn using `stdscr.addch()`, `stdscr.hline()`, and `stdscr.vline()` with ACS characters.
 
 ## Next Steps
-1.  Update unit tests to cover new TUI interactions (acknowledging environmental limitations).
-2.  Clean up: Remove temporary `test_ncurses.py` file (if it still exists).
-3.  Commit and push changes.
+1.  Fix the border box not appearing in group selection and reveal modes.
+2.  Update unit tests to cover new TUI interactions (acknowledging environmental limitations).
+3.  Clean up: Remove temporary `test_ncurses.py` file (if it still exists).

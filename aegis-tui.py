@@ -191,18 +191,26 @@ def cli_main(stdscr, args, password):
             all_entries.sort(key=lambda x: x["issuer"].lower())
 
             if group_selection_mode:
-                # Add 'All OTPs' as the first option
+                # Only populate display_list with actual groups for scrolling within the box
                 display_list = [{
-                    "name": "-- All OTPs --",
-                    "uuid": "__ALL_OTPS__" # Special UUID to signify no filter
-                }] + [{
                     "name": group.name,
                     "uuid": group.uuid
                 } for group in vault_data.db.groups]
-                display_list.sort(key=lambda x: x["name"].lower()) # Sort groups alphabetically, but keep All OTPs at top
-                # Re-add "-- All OTPs --" to the top after sorting
-                if display_list[0]["uuid"] != "__ALL_OTPS__":
-                    display_list.insert(0, {"name": "-- All OTPs --", "uuid": "__ALL_OTPS__"})
+                display_list.sort(key=lambda x: x["name"].lower()) # Sort groups alphabetically
+
+                # If "All OTPs" was previously selected, try to keep selection consistent.
+                # Otherwise, reset to the first actual group.
+                if current_group_filter == "-- All OTPs --":
+                    selected_row = -1 # Indicate no specific group is selected from the list within the box
+                elif len(display_list) > 0:
+                    # Try to find the currently selected group in the new display_list
+                    try:
+                        selected_row = next(i for i, group in enumerate(display_list) if group["name"] == current_group_filter)
+                    except StopIteration:
+                        selected_row = 0 # Default to first group if not found
+                else:
+                    selected_row = -1
+
             else:
                 display_list = all_entries # Use filtered entries for display
 
@@ -256,8 +264,9 @@ def cli_main(stdscr, args, password):
 
 
             row = 0 # Reset row for each refresh
+            header_row_offset = 0 # Offset for content after headers
 
-            # Print header based on mode, search, and group filter
+            # Print main header based on mode, search, and group filter
             if group_selection_mode:
                 stdscr.addstr(row, 0, "--- Select Group (Ctrl+G/Esc to cancel) ---")
             elif current_mode == "search":
@@ -268,26 +277,58 @@ def cli_main(stdscr, args, password):
                 elif args.group:
                     stdscr.addstr(row, 0, f"--- Group: {args.group} ---")
                 else:
-                    stdscr.addstr(row, 0, "--- All OTPs ---")
+                    stdscr.addstr(row, 0, "--- All OTPs ---") # This will be the main header if no filters
             elif current_mode == "reveal" and len(display_list) == 1:
                  stdscr.addstr(row, 0, f"--- Revealed OTP: {display_list[0]['name']} ---")
             row += 1
 
-            # Print header for table (Groups or OTPs)
+            # Handle "-- All OTPs --" display in group selection mode, outside the box
             if group_selection_mode:
-                stdscr.addstr(row, 0, f"{'#'.ljust(3)} {'Group Name'.ljust(max_name_len)}")
-                row += 1
-                stdscr.addstr(row, 0, f"{'---'.ljust(3)} {'-' * max_name_len}")
-                row += 1
-            else:
-                stdscr.addstr(row, 0, f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}")
-                row += 1
-                stdscr.addstr(row, 0, f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}")
-                row += 1
+                all_otps_text = "-- All OTPs --"
+                attribute = HIGHLIGHT_COLOR if current_group_filter is None else curses.A_NORMAL
+                stdscr.addstr(row, 0, all_otps_text, attribute)
+                row += 1 # Advance row after "All OTPs" line
 
-            # Print formatted output
+            # Define box dimensions. Leave 1 line for top/bottom borders + 1 for input prompt.
+            # We use max_rows - 1 for input prompt, so actual content height is max_rows - row - 1.
+            box_start_row = row
+            box_start_col = 0
+            box_height = max_rows - box_start_row - 1 # 1 for input prompt row
+            box_width = max_cols
+
+            # Draw the border box manually
+            stdscr.attron(curses.A_NORMAL)
+            stdscr.addch(box_start_row, box_start_col, curses.ACS_ULCORNER)
+            stdscr.hline(box_start_row, box_start_col + 1, curses.ACS_HLINE, box_width - 2)
+            stdscr.addch(box_start_row, box_start_col + box_width - 1, curses.ACS_URCORNER)
+
+            stdscr.vline(box_start_row + 1, box_start_col, curses.ACS_VLINE, box_height - 2)
+            stdscr.vline(box_start_row + 1, box_start_col + box_width - 1, curses.ACS_VLINE, box_height - 2)
+
+            stdscr.addch(box_start_row + box_height - 1, box_start_col, curses.ACS_LLCORNER)
+            stdscr.hline(box_start_row + box_height - 1, box_start_col + 1, curses.ACS_HLINE, box_width - 2)
+            stdscr.addch(box_start_row + box_height - 1, box_start_col + box_width - 1, curses.ACS_LRCORNER)
+            stdscr.attroff(curses.A_NORMAL)
+
+            # Adjust row for content inside the box (after top border)
+            row = box_start_row + 1 # Start printing content inside the box, below the top border
+
+            # Print header for table (Groups or OTPs) - inside the box
+            current_content_row = row # Track current row for content inside the box
+            if group_selection_mode:
+                stdscr.addstr(current_content_row, box_start_col + 1, f"{'#'.ljust(3)} {'Group Name'.ljust(max_name_len)}")
+                current_content_row += 1
+                stdscr.addstr(current_content_row, box_start_col + 1, f"{'---'.ljust(3)} {'-' * max_name_len}")
+                current_content_row += 1
+            else:
+                stdscr.addstr(current_content_row, box_start_col + 1, f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}")
+                current_content_row += 1
+                stdscr.addstr(current_content_row, box_start_col + 1, f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}")
+                current_content_row += 1
+
+            # Print formatted output - inside the box
             for i, item in enumerate(display_list): # Use enumerate to get the index for highlighting
-                if row >= max_rows - 2: # Leave space for the input prompt
+                if current_content_row >= box_start_row + box_height - 1: # Leave space for the bottom border
                     break
 
                 line = ""
@@ -324,17 +365,18 @@ def cli_main(stdscr, args, password):
                         else:
                             attribute = curses.A_NORMAL
                 
-                stdscr.addstr(row, 0, line, attribute)
-                row += 1
+                stdscr.addstr(current_content_row, box_start_col + 1, line, attribute)
+                current_content_row += 1
             stdscr.refresh()
 
             # --- Input Handling for "Search" Mode with Arrow Key Navigation ---
             ### START_INPUT_HANDLING_REFACTOR ###
             # --- Input Handling ---
+            input_prompt_row = max_rows - 1
             if group_selection_mode:
-                stdscr.addstr(row, 0, "Select a group (Enter to confirm, Ctrl+G/Esc to cancel): ")
+                stdscr.addstr(input_prompt_row, 0, "Select a group (Enter to confirm, Ctrl+G/Esc to cancel): ")
             elif current_mode == "search":
-                stdscr.addstr(row, 0, f"Type to filter, use arrows to select, Enter to reveal (Ctrl+G for groups, Ctrl+C to exit): {search_term}")
+                stdscr.addstr(input_prompt_row, 0, f"Type to filter, use arrows to select, Enter to reveal (Ctrl+G for groups, Ctrl+C to exit): {search_term}")
             stdscr.refresh()
 
             char = stdscr.getch() # Get a single character
@@ -342,32 +384,32 @@ def cli_main(stdscr, args, password):
             if char != curses.ERR: # Only process if a key was actually pressed
                 if group_selection_mode:
                     if char == curses.KEY_UP:
-                        if len(display_list) > 0:
+                        if selected_row == 0: # If at the first group, move to "All OTPs"
+                            selected_row = -1
+                        elif len(display_list) > 0:
                             selected_row = max(0, selected_row - 1)
-                        else:
-                            selected_row = -1
                     elif char == curses.KEY_DOWN:
-                        if len(display_list) > 0:
+                        if selected_row == -1: # If at "All OTPs", move to the first group
+                            if len(display_list) > 0:
+                                selected_row = 0
+                        elif len(display_list) > 0:
                             selected_row = min(len(display_list) - 1, selected_row + 1)
-                        else:
-                            selected_row = -1
                     elif char == 27 or char == 7: # ESC or Ctrl+G
                         group_selection_mode = False
                         current_group_filter = None
                         selected_row = 0 if len(all_entries) > 0 else -1 # Reset selection for all entries
                         search_term = "" # Clear search term
                     elif char == curses.KEY_ENTER or char in [10, 13]:
-                        if selected_row != -1 and len(display_list) > 0:
+                        if selected_row == -1: # "All OTPs" selected
+                            current_group_filter = None # Clear filter
+                        elif selected_row != -1 and len(display_list) > 0:
                             selected_group = display_list[selected_row]
-                            if selected_group["uuid"] == "__ALL_OTPS__":
-                                current_group_filter = None # Clear filter
-                            else:
-                                current_group_filter = selected_group["name"]
-                            revealed_otps.clear() # Clear revealed OTPs when a new group filter is applied or cleared
-                            group_selection_mode = False
-                            current_mode = "search" # Explicitly set mode to search after group selection
-                            selected_row = 0 if len(all_entries) > 0 else -1 # Reset selection for filtered entries
-                            search_term = "" # Clear search term
+                            current_group_filter = selected_group["name"]
+                        revealed_otps.clear() # Clear revealed OTPs when a new group filter is applied or cleared
+                        group_selection_mode = False
+                        current_mode = "search" # Explicitly set mode to search after group selection
+                        selected_row = 0 if len(all_entries) > 0 else -1 # Reset selection for filtered entries
+                        search_term = "" # Clear search term
                 elif current_mode == "search": # Normal search mode
                     if char == curses.KEY_UP:
                         if len(all_entries) > 0:

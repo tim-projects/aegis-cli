@@ -293,8 +293,8 @@ def cli_main(stdscr, args, password):
             # We use max_rows - 1 for input prompt, so actual content height is max_rows - row - 1.
             box_start_row = row
             box_start_col = 0
-            box_height = max_rows - box_start_row - 1 # 1 for input prompt row
-            box_width = max_cols
+            box_height = max(2, max_rows - box_start_row - 1) # Ensure min height of 2
+            box_width = max(2, max_cols) # Ensure min width of 2
 
             # Draw the border box manually
             stdscr.attron(curses.A_NORMAL)
@@ -470,27 +470,50 @@ def cli_main(stdscr, args, password):
                     countdown_row = 0 # Local row counter for reveal mode
                     stdscr.addstr(countdown_row, 0, f"--- Revealed OTP: {display_list[0]['name']} ---")
                     countdown_row += 1
-                    
-                    stdscr.addstr(countdown_row, 0, f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}")
+
+                    # Define box dimensions for reveal mode. Similar logic to main loop.
+                    reveal_box_start_row = countdown_row
+                    reveal_box_start_col = 0
+                    reveal_box_height = max(2, max_rows - reveal_box_start_row - 1) # 1 for input prompt row
+                    reveal_box_width = max(2, max_cols)
+
+                    # Draw the border box manually for reveal mode
+                    stdscr.attron(curses.A_NORMAL)
+                    stdscr.addch(reveal_box_start_row, reveal_box_start_col, curses.ACS_ULCORNER)
+                    stdscr.hline(reveal_box_start_row, reveal_box_start_col + 1, curses.ACS_HLINE, reveal_box_width - 2)
+                    stdscr.addch(reveal_box_start_row, reveal_box_start_col + reveal_box_width - 1, curses.ACS_URCORNER)
+
+                    stdscr.vline(reveal_box_start_row + 1, reveal_box_start_col, curses.ACS_VLINE, reveal_box_height - 2)
+                    stdscr.vline(reveal_box_start_row + 1, reveal_box_start_col + reveal_box_width - 1, curses.ACS_VLINE, reveal_box_height - 2)
+
+                    stdscr.addch(reveal_box_start_row + reveal_box_height - 1, reveal_box_start_col, curses.ACS_LLCORNER)
+                    stdscr.hline(reveal_box_start_row + reveal_box_height - 1, reveal_box_start_col + 1, curses.ACS_HLINE, reveal_box_width - 2)
+                    stdscr.addch(reveal_box_start_row + reveal_box_height - 1, reveal_box_start_col + reveal_box_width - 1, curses.ACS_LRCORNER)
+                    stdscr.attroff(curses.A_NORMAL)
+
+                    # Adjust countdown_row for content inside the box
+                    countdown_row = reveal_box_start_row + 1
+
+                    stdscr.addstr(countdown_row, reveal_box_start_col + 1, f"{'#'.ljust(3)} {'Issuer'.ljust(max_issuer_len)}  {'Name'.ljust(max_name_len)}  {'Code'.ljust(6)}  {'Group'.ljust(max_group_len)}  {'Note'.ljust(max_note_len)}")
                     countdown_row += 1
-                    stdscr.addstr(countdown_row, 0, f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}")
+                    stdscr.addstr(countdown_row, reveal_box_start_col + 1, f"{'---'.ljust(3)} {'-' * max_issuer_len}  {'-' * max_name_len}  {'------'}  {'-' * max_group_len}  {'-' * max_note_len}")
                     countdown_row += 1
                     
                     # Print prefix before OTP
                     prefix = f"{str(item['index']).ljust(3)} {item['issuer'].ljust(max_issuer_len)}  {item['name'].ljust(max_name_len)}  "
-                    stdscr.addstr(countdown_row, 0, prefix, BOLD_WHITE_COLOR if curses_colors_enabled else curses.A_NORMAL)
+                    stdscr.addstr(countdown_row, reveal_box_start_col + 1, prefix, BOLD_WHITE_COLOR if curses_colors_enabled else curses.A_NORMAL)
 
                     # Print OTP with highlight
-                    otp_start_col = len(prefix)
-                    stdscr.addstr(countdown_row, otp_start_col, otp_to_reveal.ljust(6), HIGHLIGHT_COLOR if curses_colors_enabled else curses.A_NORMAL)
+                    otp_start_col_in_box = len(prefix)
+                    stdscr.addstr(countdown_row, reveal_box_start_col + 1 + otp_start_col_in_box, otp_to_reveal.ljust(6), HIGHLIGHT_COLOR if curses_colors_enabled else curses.A_NORMAL)
 
                     # Print suffix after OTP
                     suffix = f"  {item['groups'].ljust(max_group_len)}  {item['note'].ljust(max_note_len)}"
-                    stdscr.addstr(countdown_row, otp_start_col + 6, suffix, BOLD_WHITE_COLOR if curses_colors_enabled else curses.A_NORMAL)
+                    stdscr.addstr(countdown_row, reveal_box_start_col + 1 + otp_start_col_in_box + 6, suffix, BOLD_WHITE_COLOR if curses_colors_enabled else curses.A_NORMAL)
                     countdown_row += 1
 
                     countdown_text = f"Time until next refresh: {remaining_seconds_for_display:.1f} seconds (Press ESC to go back)"
-                    stdscr.addstr(countdown_row, 0, countdown_text, DIM_COLOR if curses_colors_enabled else curses.A_NORMAL)
+                    stdscr.addstr(max_rows - 1, 0, countdown_text, DIM_COLOR if curses_colors_enabled else curses.A_NORMAL) # Place at bottom
                     
                     stdscr.refresh() # Refresh screen after all updates
 

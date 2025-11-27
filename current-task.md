@@ -28,9 +28,6 @@ We are now implementing a `ncurses`-based TUI to provide a more intuitive select
 *   **`ESC key not working in Reveal Mode`:**
     *   **Finding:** Pressing `ESC` (char 27) in reveal mode does not exit the reveal loop and return to search mode.
     *   **Mitigation:** To be implemented.
-*   **`Border box not appearing in group selection and reveal modes`:**
-    *   **Finding:** The manually drawn border box, implemented in the previous step, only appears correctly in search mode, but not when in group selection or reveal modes.
-    *   **Mitigation:** To be investigated and fixed. This likely involves ensuring `box_start_row`, `box_start_col`, `box_height`, and `box_width` are correctly calculated and the drawing logic is consistently applied in all relevant modes.
 
 ## Completed Tasks & Mitigations
 *   **`UnboundLocalError: cannot access local variable 'char'`:**
@@ -77,10 +74,12 @@ We are now implementing a `ncurses`-based TUI to provide a more intuitive select
         *   Resolved issues where the filtered group list lacked a highlighted selection and OTPs were unexpectedly revealed, by ensuring `revealed_otps` is cleared on mode change and group selection, and explicitly setting `current_mode = "search"` after group selection.
         *   Implemented dark blue border highlighting for the revealed OTP code.
 *   **Border box for OTP list, group list, and reveal mode:**
-    *   **Progress:** Manually drawing the box now, resolving `TypeError`.
-    *   **Fixed:** Previously used `stdscr.box()` resulted in `TypeError`. The border is now manually drawn using `stdscr.addch()`, `stdscr.hline()`, and `stdscr.vline()` with ACS characters.
+    *   **Progress:** The border box is now manually drawn and includes minimum dimension checks.
+    *   **Fixed:**
+        *   Previously used `stdscr.box()` resulted in `TypeError`. The border is now manually drawn using `stdscr.addch()`, `stdscr.hline()`, and `stdscr.vline()` with ACS characters.
+        *   Ensured `box_height` and `box_width` for the main display and `reveal_box_height` and `reveal_box_width` for the reveal mode are at least 2 to prevent drawing issues in very small terminal dimensions.
+        *   The border drawing logic was moved inside the `reveal` mode's loop and its content positioning was adjusted to use the calculated box coordinates.
 
 ## Next Steps
-1.  Fix the border box not appearing in group selection and reveal modes.
-2.  Update unit tests to cover new TUI interactions (acknowledging environmental limitations).
-3.  Clean up: Remove temporary `test_ncurses.py` file (if it still exists).
+1.  Update unit tests to cover new TUI interactions (acknowledging environmental limitations).
+2.  Clean up: Remove temporary `test_ncurses.py` file (if it still exists).

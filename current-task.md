@@ -28,6 +28,9 @@ We are now implementing a `ncurses`-based TUI to provide a more intuitive select
 *   **`ESC key not working in Reveal Mode`:**
     *   **Finding:** Pressing `ESC` (char 27) in reveal mode does not exit the reveal loop and return to search mode.
     *   **Mitigation:** To be implemented.
+*   **`Border box not appearing in group selection and reveal modes`:**
+    *   **Finding:** The manually drawn border box, implemented in the previous step, only appears correctly in search mode, but not when in group selection or reveal modes.
+    *   **Mitigation:** To be investigated and fixed. This likely involves ensuring `box_start_row`, `box_start_col`, `box_height`, and `box_width` are correctly calculated and the drawing logic is consistently applied in all relevant modes.
 
 ## Completed Tasks & Mitigations
 *   **`UnboundLocalError: cannot access local variable 'char'`:**
@@ -58,7 +61,7 @@ We are now implementing a `ncurses`-based TUI to provide a more intuitive select
     *   **Finding:** In the reveal mode, `display_data` was referenced instead of `display_list`.
     *   **Mitigation:** Replaced all instances of `display_data` with `display_list` in the reveal mode logic.
 *   **`AssertionError: 'Nomatch' not found in ...` (incorrect reveal behavior):**
-    *   **Finding:** The application was incorrectly transitioning to "reveal" mode when the search term was empty and only one OTP entry existed, even if that entry didn't match.
+    *   **Finding:** The application was incorrectly transitioning to "reveal" mode when the search term was empty and only one OTP entry existed, even if that entry's didn't match.
     *   **Mitigation:** Modified the condition for entering "reveal" mode to require a non-empty `search_term` in addition to having a single matching entry.
 *   **Rapid blinking of prompt and filtering issues:**
     *   **Finding:** Rapid screen clearing and unresponsive filtering due to fast loop cycles and `search_term` not updating before display.
@@ -79,6 +82,18 @@ We are now implementing a `ncurses`-based TUI to provide a more intuitive select
         *   Previously used `stdscr.box()` resulted in `TypeError`. The border is now manually drawn using `stdscr.addch()`, `stdscr.hline()`, and `stdscr.vline()` with ACS characters.
         *   Ensured `box_height` and `box_width` for the main display and `reveal_box_height` and `reveal_box_width` for the reveal mode are at least 2 to prevent drawing issues in very small terminal dimensions.
         *   The border drawing logic was moved inside the `reveal` mode's loop and its content positioning was adjusted to use the calculated box coordinates.
+*   **`TypeError: 'PyTOTP' object is not subscriptable` / `AttributeError: 'PyHOTP' object has no attribute 'uuid'` (Incorrect item revealed):**
+    *   **Finding:** The `entry_to_reveal` was inconsistently treated as either a dictionary or an `OtpEntry` object, leading to `TypeError` or `AttributeError` during revelation.
+    *   **Mitigation:** Consolidated the logic: `entry_to_reveal` is now consistently the dictionary representation of the entry (from `all_entries`), allowing `entry_to_reveal["uuid"]` access. The actual `OTP` object is retrieved from the `otps` dictionary (using `otps[entry_to_reveal["uuid"]]`) only when its `string()` method is needed for display or copying.
+*   **`Reveal always selecting entry with ID 42 no matter the selection` (Incorrect item revealed in reveal mode, part 1):**
+    *   **Finding:** Even after previous fixes, the dedicated "reveal mode" displayed details for a fixed entry (ID 42) or an outdated `item` reference, rather than the user's selected entry.
+    *   **Mitigation:** Modified the reveal mode's display logic to consistently use the `entry_to_reveal` dictionary (which holds the correctly selected item's details) for all display elements, including the header and individual field values. This ensures that the visually selected entry's information is accurately presented.
+*   **`Selected_row mismatch for navigation` (Incorrect item revealed in reveal mode, part 2):**
+    *   **Finding:** The `selected_row` variable in `search` mode was incorrectly updated based on `len(all_entries)` instead of `len(display_list)`, causing an index mismatch for item revelation.
+    *   **Mitigation:** Corrected all `selected_row` updates in `search` mode to consistently use `len(display_list)`, synchronizing visual selection with internal indexing.
+*   **`Reveal mode broken; pressing Enter shows code on search screen, reveal mode never shown` (Incorrect state transition):**
+    *   **Finding:** The main `cli_main` loop's order of operations caused display rendering before input processing, leading to the search screen being redrawn even after `current_mode` was set to "reveal".
+    *   **Mitigation:** Restructured the `cli_main` loop to process all input and mode changes *before* rendering any display. If `current_mode` is set to "reveal", the main loop's display logic is bypassed, and the dedicated `reveal` mode's inner `while True` loop is entered directly.
 
 ## Next Steps
 1.  Update unit tests to cover new TUI interactions (acknowledging environmental limitations).

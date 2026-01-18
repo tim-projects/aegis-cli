@@ -1,3 +1,4 @@
+- **Refactor ncurses code into a separate module:** Extract all ncurses-related display and input handling logic into a dedicated Python module (e.g., `aegis_tui_ui.py`). This will improve modularity, maintainability, and facilitate the creation of a testable development environment.
 - resizing the terminal blanks the screen until a key is pressed - it should redraw right away by detecting the terminal resize
 - After inputting the vault password it hangs until a key is pressed before going into search mode.
 - If there are too many totp entries to fit on the screen, then we should be able to scroll inside the totp box window

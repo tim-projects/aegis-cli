@@ -20,7 +20,9 @@ package() {
   # Install Python source files into site-packages
   install -d "${pkgdir}/usr/lib/python3.13/site-packages/aegis_tui"
   install -m 644 "aegis_core.py" "${pkgdir}/usr/lib/python3.13/site-packages/aegis_tui/"
-  install -m 644 "aegis-tui.py" "${pkgdir}/usr/lib/python3.13/site-packages/aegis_tui/"
+  install -m 644 "aegis_main.py" "${pkgdir}/usr/lib/python3.13/site-packages/aegis_tui/"
+  install -m 644 "config.py" "${pkgdir}/usr/lib/python3.13/site-packages/aegis_tui/"
+  install -m 644 "tui_display.py" "${pkgdir}/usr/lib/python3.13/site-packages/aegis_tui/"
   install -m 644 "otp.py" "${pkgdir}/usr/lib/python3.13/site-packages/aegis_tui/"
   install -m 644 "vault.py" "${pkgdir}/usr/lib/python3.13/site-packages/aegis_tui/"
 
@@ -28,7 +30,7 @@ package() {
   install -d "${pkgdir}/usr/bin"
   cat > "${pkgdir}/usr/bin/aegis-tui" << EOF
 #!/bin/bash
-python3 -m aegis_tui.aegis-tui "$@"
+python3 -m aegis_tui.aegis_main "$@"
 EOF
   chmod 755 "${pkgdir}/usr/bin/aegis-tui"
 

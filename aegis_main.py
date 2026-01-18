@@ -143,7 +143,7 @@ def cli_main(stdscr, args, password):
                     "uuid": entry_to_reveal.uuid
                 }]
                 # Call reveal mode directly.
-                run_reveal_mode(stdscr, initial_display_list[0], otps, set(), get_ttn, config, max_rows, max_cols, curses_colors_enabled, initial_display_list, vault_data, colors)
+                run_reveal_mode(stdscr, initial_display_list[0], otps, set(), get_ttn, config, max_rows, max_cols, curses_colors_enabled, initial_display_list, vault_data, colors, PYPERCLIP_AVAILABLE)
                 if not args.group: # If no group filter, then exit after showing single OTP
                     return
             else:
@@ -155,7 +155,7 @@ def cli_main(stdscr, args, password):
         # Main application loop: Enter search mode
         while True:
             selected_otp_uuid = run_search_mode(
-                stdscr, vault_data, group_names, args, colors, curses_colors_enabled
+                stdscr, vault_data, group_names, args, colors, curses_colors_enabled, otps, PYPERCLIP_AVAILABLE
             )
 
             # If an OTP was selected in search mode, enter reveal mode
@@ -172,7 +172,7 @@ def cli_main(stdscr, args, password):
                         "uuid": entry_to_reveal.uuid
                     }]
                     # Call run_reveal_mode directly
-                    run_reveal_mode(stdscr, display_list_for_reveal[0], otps, set(), get_ttn, config, max_rows, max_cols, curses_colors_enabled, display_list_for_reveal, vault_data, colors)
+                    run_reveal_mode(stdscr, display_list_for_reveal[0], otps, set(), get_ttn, config, max_rows, max_cols, curses_colors_enabled, display_list_for_reveal, vault_data, colors, PYPERCLIP_AVAILABLE)
                 else:
                     stdscr.addstr(max_rows - 1, 0, f"Error: Selected entry with UUID {selected_otp_uuid} not found.", RED_TEXT_COLOR)
                     stdscr.refresh()

@@ -1,9 +1,14 @@
 import curses
+try:
+    import pyperclip
+except ImportError:
+    pass
 
 from tui_display import draw_main_screen
+from help_mode import run_help_mode
 
 def run_search_mode(
-    stdscr, vault_data, group_names, args, colors, curses_colors_enabled
+    stdscr, vault_data, group_names, args, colors, curses_colors_enabled, otps, pyperclip_available
 ):
     """Runs the interactive search mode for OTP entries."""
 
@@ -16,6 +21,9 @@ def run_search_mode(
     # Initialize state variables
     search_term = ""
     current_mode = "search" # "search" or "group_select"
+    in_search_mode = False # Start in navigation mode
+    status_message = ""
+    
     selected_row = -1 # Track the currently highlighted row for navigation (-1 for no selection)
     char = curses.ERR # Initialize char to prevent UnboundLocalError
     previous_search_term = ""
@@ -80,9 +88,6 @@ def run_search_mode(
                 display_list = groups_list # No search term, show all groups
 
             # Adjust selected_row for group list
-            # Note: We don't auto-adjust selected_row here because it messes up navigation state
-            # unless the list drastically changed (e.g. search filter).
-            # We'll rely on bounds checking below.
         else:
             display_list = all_entries # Use filtered entries for display
 
@@ -91,13 +96,6 @@ def run_search_mode(
             if not group_selection_mode:
                 selected_row = -1
             else:
-                # In group mode, we always have "All OTPs" (index -1) unless filtered out? 
-                # Actually "All OTPs" is static. If filter excludes all groups, we can still select "All OTPs".
-                # If search term doesn't match "All OTPs" (conceptually), maybe? 
-                # For now, let's assume "All OTPs" is always selectable if search_term is empty or ignored for it.
-                # But if we type "Fina", "All OTPs" shouldn't show? 
-                # Current display logic: "All OTPs" is index 0 of virtual list.
-                # Let's keep it simple: "All OTPs" is always there as index -1.
                 if selected_row != -1:
                      selected_row = -1
         else:
@@ -109,113 +107,166 @@ def run_search_mode(
             items_per_page = draw_main_screen(
                 stdscr, max_rows, max_cols, display_list, selected_row, search_term,
                 current_mode, group_selection_mode, current_group_filter, args.group,
-                colors, curses_colors_enabled, scroll_offset
+                colors, curses_colors_enabled, scroll_offset,
+                in_search_mode, status_message
             )
             needs_redraw = False # Redraw completed
+            status_message = "" # Clear status message after drawing once (or keep it? Flashing is better)
+            # Actually, if we clear it here, it will be visible for one frame. We should clear it on NEXT input.
+            # But draw_main_screen is called inside the loop.
+            # Let's not clear it here. Clear it on keypress.
 
         # --- Input Handling ---
         char = stdscr.getch() # Get a single character
 
         if char != curses.ERR: # Only process if a key was actually pressed
             needs_redraw = True # Input occurred, so redraw the screen
+            status_message = "" # Clear previous status message on new input
+            
             if char == curses.KEY_RESIZE:
                 # Terminal resized, re-get dimensions and force redraw
                 max_rows, max_cols = stdscr.getmaxyx()
                 continue
+            
+            # --- Global Hotkeys ---
+            if char == 17: # Ctrl+Q to exit
+                return None
+            
+            if char == ord('?'): # Help
+                run_help_mode(stdscr, colors)
+                needs_redraw = True
+                continue
+            
+            if char == 3: # Ctrl+C to copy
+                if pyperclip_available and selected_row != -1 and len(display_list) > 0:
+                    try:
+                        # Get UUID based on current selection
+                        if group_selection_mode:
+                             pass # No copy for groups
+                        else:
+                             uuid = display_list[selected_row]["uuid"]
+                             otp = otps[uuid]
+                             pyperclip.copy(otp.string())
+                             status_message = "OTP copied to clipboard!"
+                    except Exception as e:
+                        status_message = f"Copy failed: {str(e)}"
+                elif not pyperclip_available:
+                     status_message = "Clipboard unavailable."
+                continue
 
-            if group_selection_mode:
-                if char == curses.KEY_UP:
-                    # Virtual index mapping: -1 -> 0, 0 -> 1, ...
-                    current_v_idx = selected_row + 1
-                    if current_v_idx > 0:
-                        current_v_idx -= 1
-                        selected_row = current_v_idx - 1
-                        
-                        # Scrolling Up
-                        if current_v_idx < scroll_offset:
-                            scroll_offset = current_v_idx
-                            
-                elif char == curses.KEY_DOWN:
-                    current_v_idx = selected_row + 1
-                    total_virtual_items = len(display_list) + 1
-                    if current_v_idx < total_virtual_items - 1:
-                        current_v_idx += 1
-                        selected_row = current_v_idx - 1
-                        
-                        # Scrolling Down
-                        if current_v_idx >= scroll_offset + items_per_page:
-                            scroll_offset = current_v_idx - items_per_page + 1
-
-                elif char == 27 or char == 7: # ESC or Ctrl+G to cancel group selection
-                    group_selection_mode = False
-                    current_group_filter = None
-                    search_term = "" # Clear search term
-                    # Reset selected_row to the first item in the main OTP list if available
-                    selected_row = 0 if len(all_entries) > 0 else -1
-                    scroll_offset = 0 # Reset scroll
-                elif char == curses.KEY_ENTER or char in [10, 13]:
-                    if selected_row == -1: # "All OTPs" selected
-                        current_group_filter = None # Clear filter
-                    elif selected_row != -1 and len(display_list) > 0:
-                        selected_group = display_list[selected_row]
-                        current_group_filter = selected_group["name"]
-                    # revealed_otps.clear() # Clear revealed OTPs when a new group filter is applied or cleared
-                    group_selection_mode = False
-                    current_mode = "search" # Explicitly set mode to search after group selection
-                    # Reset selected_row for the filtered OTP list
-                    initial_filtered_entries = [entry for entry in all_entries if current_group_filter in entry["groups"]] if current_group_filter else all_entries
-                    selected_row = 0 if len(initial_filtered_entries) > 0 else -1
-                    scroll_offset = 0 # Reset scroll
-                    search_term = "" # Clear search term
-            elif current_mode == "search": # Normal search mode
-                if char == curses.KEY_UP:
-                    if len(display_list) > 0:
-                        selected_row = max(0, selected_row - 1)
-                        if selected_row < scroll_offset:
-                            scroll_offset = selected_row
-                    else:
-                        selected_row = -1
-                elif char == curses.KEY_DOWN:
+            # --- Navigation (Common logic for j/k/UP/DOWN) ---
+            move_down = False
+            move_up = False
+            
+            if char == curses.KEY_DOWN:
+                move_down = True
+            elif char == curses.KEY_UP:
+                move_up = True
+            elif not in_search_mode:
+                if char == ord('j'): move_down = True
+                elif char == ord('k'): move_up = True
+            
+            if move_down:
+                if group_selection_mode:
+                     current_v_idx = selected_row + 1
+                     total_virtual_items = len(display_list) + 1
+                     if current_v_idx < total_virtual_items - 1:
+                         selected_row = current_v_idx # (v_idx + 1) - 1
+                         if selected_row + 1 >= scroll_offset + items_per_page:
+                             scroll_offset = selected_row + 1 - items_per_page + 1
+                else:
                     if len(display_list) > 0:
                         selected_row = min(len(display_list) - 1, selected_row + 1)
                         if selected_row >= scroll_offset + items_per_page:
                             scroll_offset = selected_row - items_per_page + 1
-                    else:
-                        selected_row = -1
-                elif char == 27: # ESC key
+                continue
+                
+            if move_up:
+                if group_selection_mode:
+                    current_v_idx = selected_row + 1
+                    if current_v_idx > 0:
+                        selected_row = current_v_idx - 2 # (v_idx - 1) - 1
+                        if selected_row + 1 < scroll_offset:
+                            scroll_offset = selected_row + 1
+                else:
+                    if len(display_list) > 0:
+                        selected_row = max(0, selected_row - 1)
+                        if selected_row < scroll_offset:
+                            scroll_offset = selected_row
+                continue
+
+            # --- Mode Specific Handling ---
+            if group_selection_mode:
+                 if char == 27 or char == 7 or (not in_search_mode and char == ord('h')): # ESC/Ctrl+G/h
+                    group_selection_mode = False
+                    current_group_filter = None
                     search_term = ""
-                    # revealed_otps.clear()
-                    current_group_filter = None # Clear group filter on ESC
-                    # Reset selected_row for the OTP list
                     selected_row = 0 if len(all_entries) > 0 else -1
                     scroll_offset = 0
-                elif char in [curses.KEY_BACKSPACE, 127, 8]: # Backspace key
-                    if search_term: # Only modify search_term if it's not empty
-                        search_term = search_term[:-1]
-                        scroll_offset = 0 # Reset scroll on search change
-                elif 32 <= char < 127: # Printable character
-                    search_term += chr(char)
-                    scroll_offset = 0 # Reset scroll on search change
-                elif char == 7: # Ctrl+G to toggle group selection mode
-                    group_selection_mode = not group_selection_mode
-                    # revealed_otps.clear() # Clear revealed OTPs on mode change
-                    if group_selection_mode:
-                        selected_row = -1 # Default to "All OTPs" in group selection mode
-                        search_term = "" # Clear search term when entering group selection
+                    in_search_mode = False
+                 elif char == ord('/') and not in_search_mode:
+                    in_search_mode = True
+                 elif char == curses.KEY_ENTER or char in [10, 13] or (not in_search_mode and char == ord('l')):
+                    if selected_row == -1:
+                        current_group_filter = None
+                    elif selected_row != -1 and len(display_list) > 0:
+                        selected_group = display_list[selected_row]
+                        current_group_filter = selected_group["name"]
+                    group_selection_mode = False
+                    current_mode = "search"
+                    initial_filtered_entries = [entry for entry in all_entries if current_group_filter in entry["groups"]] if current_group_filter else all_entries
+                    selected_row = 0 if len(initial_filtered_entries) > 0 else -1
+                    scroll_offset = 0
+                    search_term = ""
+                    in_search_mode = False
+                 elif in_search_mode:
+                     # Typing logic
+                     if char in [curses.KEY_BACKSPACE, 127, 8]:
+                        if search_term:
+                            search_term = search_term[:-1]
+                            scroll_offset = 0
+                     elif 32 <= char < 127:
+                        search_term += chr(char)
                         scroll_offset = 0
-                    else:
-                        current_group_filter = None # Clear filter if exiting group selection mode
-                        # Reset selected_row for the OTP list
-                        selected_row = 0 if len(all_entries) > 0 else -1
-                        search_term = "" # Clear search term when exiting group selection
+                     elif char == 27: # Esc exits search mode
+                        in_search_mode = False
+
+            else: # Normal OTP List Mode
+                 if char == ord('/') and not in_search_mode:
+                     in_search_mode = True
+                 elif char == 27: # ESC
+                     if in_search_mode:
+                         in_search_mode = False
+                     else:
+                         search_term = ""
+                         current_group_filter = None
+                         selected_row = 0 if len(all_entries) > 0 else -1
+                         scroll_offset = 0
+                 elif not in_search_mode and char == ord('h'):
+                     # Clear search if present
+                     if search_term:
+                         search_term = ""
+                         scroll_offset = 0
+                 elif char == 7: # Ctrl+G
+                     group_selection_mode = not group_selection_mode
+                     if group_selection_mode:
+                         selected_row = -1
+                         search_term = ""
+                         scroll_offset = 0
+                         in_search_mode = False
+                 elif char == curses.KEY_ENTER or char in [10, 13] or (not in_search_mode and char == ord('l')):
+                     if selected_row != -1 and len(display_list) > 0:
+                         entry_to_reveal_uuid = display_list[selected_row]["uuid"]
+                         break
+                 elif in_search_mode:
+                     if char in [curses.KEY_BACKSPACE, 127, 8]:
+                        if search_term:
+                            search_term = search_term[:-1]
+                            scroll_offset = 0
+                     elif 32 <= char < 127:
+                        search_term += chr(char)
                         scroll_offset = 0
-                elif char == 3: # Ctrl+C to exit application
-                    return None # Signal to exit
-                elif char == curses.KEY_ENTER or char in [10, 13]:
-                    # Only reveal if an item is selected
-                    if selected_row != -1 and len(display_list) > 0:
-                        entry_to_reveal_uuid = display_list[selected_row]["uuid"] # Return the UUID of the selected entry
-                        break # Exit search loop to process reveal
+
         else:
             import time
             time.sleep(0.01) # Small delay to prevent tight loop if no input

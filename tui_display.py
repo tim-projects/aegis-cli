@@ -70,7 +70,8 @@ def _calculate_column_widths(stdscr, max_cols, display_list, group_selection_mod
 def draw_main_screen(
     stdscr, max_rows, max_cols, display_list, selected_row, search_term,
     current_mode, group_selection_mode, current_group_filter,
-    cli_args_group, colors, curses_colors_enabled, scroll_offset=0
+    cli_args_group, colors, curses_colors_enabled, scroll_offset=0,
+    in_search_mode=False, status_message=""
 ):
     NORMAL_TEXT_COLOR = colors["NORMAL_TEXT_COLOR"]
     HIGHLIGHT_COLOR = colors["HIGHLIGHT_COLOR"]
@@ -202,14 +203,34 @@ def draw_main_screen(
             row += 1
 
     # Prompt
-    prompt_string_prefix = "Search: " if current_mode == "search" else "Group Filter: "
-    current_input_text = search_term if current_mode == "search" else (search_term if group_selection_mode else "")
     prompt_row = max_rows - 1
     if prompt_row < 0: prompt_row = 0
-    stdscr.addstr(prompt_row, 0, (prompt_string_prefix + current_input_text)[:max_cols], NORMAL_TEXT_COLOR)
+    
+    if status_message:
+        stdscr.addstr(prompt_row, 0, status_message[:max_cols], HIGHLIGHT_COLOR)
+    else:
+        current_input_text = search_term
+        if in_search_mode:
+            prompt_prefix = "Search: "
+            stdscr.addstr(prompt_row, 0, (prompt_prefix + current_input_text)[:max_cols], NORMAL_TEXT_COLOR)
+            # Optionally add cursor?
+            curses.curs_set(1) # Show cursor
+            # Position cursor
+            # stdscr.move(prompt_row, len(prompt_prefix) + len(current_input_text))
+            # Actually, let's keep it simple with no explicit cursor move, or do we need it?
+            # Curses wrapper might handle it if we move there.
+        else:
+            prompt_prefix = "Filter: " if current_input_text else "Press / to search"
+            display_text = (prompt_prefix + (current_input_text if current_input_text else ""))[:max_cols]
+            stdscr.addstr(prompt_row, 0, display_text, curses.A_DIM)
+            curses.curs_set(0) # Hide cursor in nav mode
 
     # Instructions
-    stdscr.addstr(max_rows - 2, 0, "Ctrl+G: Toggle Groups | ESC: Clear Search/Exit Group Select | Enter: Reveal", curses.A_DIM)
+    instruction_text = "?: Help | j/k: Nav | /: Search | Ctrl+C: Copy | Ctrl+Q: Exit | Enter: Reveal"
+    if group_selection_mode:
+        instruction_text = "?: Help | j/k: Nav | /: Search | Enter: Select | Esc: Cancel"
+        
+    stdscr.addstr(max_rows - 2, 0, instruction_text[:max_cols], curses.A_DIM)
 
     stdscr.refresh()
     return max_visible_items

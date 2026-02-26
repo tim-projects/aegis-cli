@@ -68,7 +68,7 @@ def cli_main(stdscr, args, password):
 
         stdscr.clear()
 
-        box_height = 10
+        box_height = 8
         box_width = max(50, max_cols - 10)
         start_row = (max_rows - box_height) // 2
         start_col = (max_cols - box_width) // 2
@@ -110,10 +110,10 @@ def cli_main(stdscr, args, password):
             start_row + 4, start_col + 2 + len(prompt), pwd_display, HIGHLIGHT_COLOR
         )
 
-        ctrl_msg = "Enter: Unlock | ESC: Quit"
-        stdscr.addstr(start_row + 7, start_col + 2, ctrl_msg, NORMAL_TEXT_COLOR)
-
         stdscr.refresh()
+
+        ctrl_msg = "Enter: Unlock | ESC: Quit"
+        stdscr.addstr(max_rows - 2, 0, ctrl_msg[:max_cols], curses.A_DIM)
 
         ch = stdscr.getch()
 

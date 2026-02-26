@@ -57,44 +57,81 @@ def cli_main(stdscr, args, password):
             return
 
     row = 0
+    stdscr.clear()
+
+    vault_name = os.path.basename(vault_path)
+    pwd_input = []
+
     while True:
-        try:
-            entries = cli_backend.get_entries(vault_path, password)
-            break
-        except cli_backend.CLIError as e:
-            row += 1
-            if row >= max_rows - 2:
-                row = 0
-            stdscr.addstr(row, 0, f"Error: {e}", RED_TEXT_COLOR)
-            row += 1
-            stdscr.addstr(row, 0, "Enter vault password: ")
-            stdscr.refresh()
+        max_rows, max_cols = stdscr.getmaxyx()
 
-            curses.noecho()
-            pwd_input = []
-            while True:
-                ch = stdscr.getch()
-                if ch in [10, 13]:
-                    break
-                elif ch in [8, 127, curses.KEY_BACKSPACE]:
-                    if pwd_input:
-                        pwd_input.pop()
-                        y, x = stdscr.getyx()
-                        stdscr.move(y, x - 1)
-                        stdscr.delch()
-                elif 32 <= ch <= 126:
-                    pwd_input.append(chr(ch))
-                    stdscr.addch("*")
+        stdscr.clear()
 
+        box_height = 8
+        box_width = max(50, max_cols - 10)
+        start_row = (max_rows - box_height) // 2
+        start_col = (max_cols - box_width) // 2
+        if start_row < 0:
+            start_row = 0
+        if start_col < 0:
+            start_col = 0
+
+        stdscr.addch(start_row, start_col, curses.ACS_ULCORNER)
+        stdscr.hline(start_row, start_col + 1, curses.ACS_HLINE, box_width - 2)
+        stdscr.addch(start_row, start_col + box_width - 1, curses.ACS_URCORNER)
+        for r in range(start_row + 1, start_row + box_height - 1):
+            stdscr.addch(r, start_col, curses.ACS_VLINE)
+            stdscr.addch(r, start_col + box_width - 1, curses.ACS_VLINE)
+        stdscr.addch(start_row + box_height - 1, start_col, curses.ACS_LLCORNER)
+        stdscr.hline(
+            start_row + box_height - 1, start_col + 1, curses.ACS_HLINE, box_width - 2
+        )
+        stdscr.addch(
+            start_row + box_height - 1, start_col + box_width - 1, curses.ACS_LRCORNER
+        )
+
+        header = "Aegis Authenticator"
+        stdscr.addstr(
+            start_row + 1,
+            start_col + (box_width - len(header)) // 2,
+            header,
+            BOLD_WHITE_COLOR if curses_colors_enabled else curses.A_BOLD,
+        )
+
+        vault_label = f"Vault: {vault_name}"
+        stdscr.addstr(start_row + 3, start_col + 2, vault_label, NORMAL_TEXT_COLOR)
+
+        prompt = "Enter vault password: "
+        stdscr.addstr(start_row + 4, start_col + 2, prompt, NORMAL_TEXT_COLOR)
+
+        pwd_display = "*" * len(pwd_input)
+        stdscr.addstr(
+            start_row + 4, start_col + 2 + len(prompt), pwd_display, HIGHLIGHT_COLOR
+        )
+
+        stdscr.refresh()
+
+        ch = stdscr.getch()
+
+        if ch in [10, 13]:
             password = "".join(pwd_input)
-            row += 1
-            stdscr.addstr(row, 0, "Verifying...")
-            stdscr.refresh()
-            row += 1
-
-            if row > max_rows - 5:
-                stdscr.clear()
-                row = 0
+            try:
+                entries = cli_backend.get_entries(vault_path, password)
+                break
+            except cli_backend.CLIError as e:
+                stdscr.addstr(
+                    start_row + 6, start_col + 2, f"Error: {e}", RED_TEXT_COLOR
+                )
+                stdscr.refresh()
+                curses.napms(1500)
+                pwd_input = []
+        elif ch in [8, 127, curses.KEY_BACKSPACE]:
+            if pwd_input:
+                pwd_input.pop()
+        elif 32 <= ch <= 126:
+            pwd_input.append(chr(ch))
+        elif ch == 27:
+            return
 
     config["last_opened_vault"] = vault_path
     config["last_vault_dir"] = os.path.dirname(vault_path)

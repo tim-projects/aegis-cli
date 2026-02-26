@@ -58,7 +58,6 @@ def cli_main(stdscr, args, password):
 
     row = 0
     stdscr.clear()
-    curses.curs_set(0)
 
     vault_name = os.path.basename(vault_path)
     pwd_input = []
@@ -69,7 +68,7 @@ def cli_main(stdscr, args, password):
 
         stdscr.clear()
 
-        box_height = 8
+        box_height = 10
         box_width = max(50, max_cols - 10)
         start_row = (max_rows - box_height) // 2
         start_col = (max_cols - box_width) // 2
@@ -111,10 +110,10 @@ def cli_main(stdscr, args, password):
             start_row + 4, start_col + 2 + len(prompt), pwd_display, HIGHLIGHT_COLOR
         )
 
-        stdscr.refresh()
-
         ctrl_msg = "Enter: Unlock | ESC: Quit"
-        stdscr.addstr(max_rows - 2, 0, ctrl_msg[:max_cols], curses.A_DIM)
+        stdscr.addstr(start_row + 7, start_col + 2, ctrl_msg, NORMAL_TEXT_COLOR)
+
+        stdscr.refresh()
 
         ch = stdscr.getch()
 
@@ -125,19 +124,14 @@ def cli_main(stdscr, args, password):
                 break
             except cli_backend.CLIError as e:
                 stdscr.addstr(
-                    start_row + box_height, start_col + 2, f"Error: {e}", RED_TEXT_COLOR
+                    start_row + 6, start_col + 2, f"Error: {e}", RED_TEXT_COLOR
                 )
                 stdscr.refresh()
-                stdscr.nodelay(False)
-                stdscr.getch()
-                stdscr.nodelay(True)
-                stdscr.clear()
+                curses.napms(1500)
                 return
         elif ch in [8, 127, curses.KEY_BACKSPACE]:
             if pwd_input:
                 pwd_input.pop()
-        elif ch == curses.ERR:
-            pass
         elif 32 <= ch <= 126:
             pwd_input.append(chr(ch))
         elif ch == 27:
@@ -284,10 +278,7 @@ def main():
     if not password:
         password = os.getenv("AEGIS_CLI_PASSWORD")
 
-    while True:
-        result = curses.wrapper(cli_main, args, password)
-        if result == "exit":
-            break
+    curses.wrapper(cli_main, args, password)
 
 
 if __name__ == "__main__":

@@ -39,6 +39,8 @@ def run_search_mode(
     entry_to_reveal_uuid = None
     needs_redraw = True
 
+    last_esc_time = 0
+
     all_groups = []
     group_name_map = {}
     for entry in entries:
@@ -152,8 +154,15 @@ def run_search_mode(
                 max_rows, max_cols = stdscr.getmaxyx()
                 continue
 
-            if char == 17:
-                return None
+            if char == 27:
+                import time
+
+                current_time = time.time()
+                if current_time - last_esc_time < 0.5:
+                    return None
+                last_esc_time = current_time
+                status_message = "Press ESC again to exit"
+                continue
 
             if char == ord("?"):
                 run_help_mode(stdscr, colors)

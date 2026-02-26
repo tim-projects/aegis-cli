@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+import argparse
+import getpass
+import os
+import sys
+import json
+import time
+
+from aegis_core import find_vault_path, read_and_decrypt_vault_file, get_otps
+from config import load_config, save_config, DEFAULT_AEGIS_VAULT_DIR
+
+
+def format_entry_json(entry, otp_value, group_names):
+    otp_str = otp_value.string() if otp_value else None
+    return {
+        "uuid": entry.uuid,
+        "name": entry.name,
+        "issuer": entry.issuer if entry.issuer else "",
+        "groups": [group_names.get(g, g) for g in entry.groups] if entry.groups else [],
+        "note": entry.note if entry.note else "",
+        "otp": otp_str,
+        "type": entry.type,
+    }
+
+
+def cli_main(args):
+    config = load_config()
+    vault_path = args.vault_path
+
+    if not vault_path and config["last_opened_vault"]:
+        vault_path = config["last_opened_vault"]
+
+    if not vault_path:
+        vault_path = find_vault_path(args.vault_dir)
+
+        if not vault_path and args.vault_dir != DEFAULT_AEGIS_VAULT_DIR:
+            vault_path = find_vault_path(DEFAULT_AEGIS_VAULT_DIR)
+            args.vault_dir = DEFAULT_AEGIS_VAULT_DIR
+
+        if not vault_path:
+            if args.json:
+                print(json.dumps({"error": "No vault file found"}))
+                sys.exit(1)
+            else:
+                print("Error: No vault file found. Exiting.")
+                sys.exit(1)
+
+    password = args.password
+    if not password:
+        password = os.getenv("AEGIS_CLI_PASSWORD")
+        if not password:
+            try:
+                password = getpass.getpass("Enter vault password: ")
+            except (KeyboardInterrupt, EOFError):
+                print("\nExiting.")
+                sys.exit(0)
+
+    try:
+        vault_data = read_and_decrypt_vault_file(vault_path, password)
+    except ValueError as e:
+        if args.json:
+            print(json.dumps({"error": str(e)}))
+            sys.exit(1)
+        else:
+            print(f"Error decrypting vault: {e}")
+            sys.exit(1)
+
+    config["last_opened_vault"] = vault_path
+    config["last_vault_dir"] = os.path.dirname(vault_path)
+    save_config(config)
+
+    group_names = {group.uuid: group.name for group in vault_data.db.groups}
+    otps = get_otps(vault_data)
+
+    if args.uuid:
+        entry = next((e for e in vault_data.db.entries if e.uuid == args.uuid), None)
+        if not entry:
+            if args.json:
+                print(json.dumps({"error": f"No entry found with UUID {args.uuid}"}))
+                sys.exit(1)
+            else:
+                print(f"Error: No entry found with UUID {args.uuid}")
+                sys.exit(1)
+
+        otp_value = otps.get(args.uuid)
+        if args.json:
+            print(
+                json.dumps(
+                    format_entry_json(
+                        entry, otp_value, group_names
+                    )
+                )
+            )
+        else:
+            if otp_value:
+                print(otp_value.string())
+            else:
+                print(f"Error: Could not generate OTP for {entry.name}")
+                sys.exit(1)
+        return
+
+    entries = vault_data.db.entries
+    if args.group:
+        group_uuid = next(
+            (g.uuid for g in vault_data.db.groups if g.name == args.group), None
+        )
+        if not group_uuid:
+            if args.json:
+                print(json.dumps({"error": f"Group '{args.group}' not found"}))
+                sys.exit(1)
+            else:
+                print(f"Error: Group '{args.group}' not found")
+                sys.exit(1)
+        entries = [e for e in entries if group_uuid in e.groups]
+
+    if args.json:
+        result = []
+        for entry in entries:
+            otp_value = otps.get(entry.uuid)
+            result.append(
+                format_entry_json(
+                    entry, otp_value, group_names
+                )
+            )
+        print(json.dumps(result))
+    else:
+        for entry in entries:
+            otp_value = otps.get(entry.uuid)
+            issuer = f"{entry.issuer} - " if entry.issuer else ""
+            groups_str = (
+                f" [{', '.join(group_names.get(g, g) for g in entry.groups)}]"
+                if entry.groups
+                else ""
+            )
+            otp_str = otp_value.string() if otp_value else "N/A"
+            print(f"{issuer}{entry.name}{groups_str}: {otp_str}")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Aegis Authenticator CLI in Python.", prog="aegis-cli"
+    )
+    parser.add_argument(
+        "vault_path", nargs="?", help="Path to the Aegis vault file.", default=None
+    )
+    parser.add_argument(
+        "-d",
+        "--vault-dir",
+        help="Directory to search for vault files. Defaults to current directory.",
+        default=".",
+    )
+    parser.add_argument("-u", "--uuid", help="Display OTP for a specific entry UUID.")
+    parser.add_argument(
+        "-g", "--group", help="Filter OTP entries by a specific group name."
+    )
+    parser.add_argument(
+        "-p", "--password", help="Vault password (or use AEGIS_CLI_PASSWORD env var)."
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="Output all info as JSON objects."
+    )
+
+    args = parser.parse_args()
+    cli_main(args)
+
+
+if __name__ == "__main__":
+    main()

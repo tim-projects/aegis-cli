@@ -82,8 +82,8 @@ def run_reveal_mode(
 
     next_refresh_time = entry_timestamp_ms + (period * 1000)
 
-    reveal_box_height = max(7, max_rows - 2)
-    reveal_box_width = max(30, max_cols)
+    reveal_box_height = max(12, max_rows - 4)
+    reveal_box_width = max(40, max_cols - 10)
     reveal_start_row = (max_rows - reveal_box_height) // 2
     reveal_start_col = (max_cols - reveal_box_width) // 2
     if reveal_start_row < 0:
@@ -168,6 +168,9 @@ def run_reveal_mode(
         inner_width,
         NORMAL_TEXT_COLOR,
     )
+
+    display_row += 1
+
     otp_code_display_row = display_row
     display_row = display_field(
         stdscr,
@@ -178,6 +181,9 @@ def run_reveal_mode(
         inner_width,
         REVEAL_HIGHLIGHT_COLOR,
     )
+
+    display_row += 1
+
     ttn_display_row = display_row
 
     stdscr.refresh()

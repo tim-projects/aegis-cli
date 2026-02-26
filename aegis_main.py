@@ -124,7 +124,7 @@ def cli_main(stdscr, args, password):
                 break
             except cli_backend.CLIError as e:
                 stdscr.addstr(
-                    start_row + 6, start_col + 2, f"Error: {e}", RED_TEXT_COLOR
+                    max_rows - 3, start_col + 2, f"Error: {e}", RED_TEXT_COLOR
                 )
                 stdscr.refresh()
                 curses.napms(1500)

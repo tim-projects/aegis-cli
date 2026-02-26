@@ -243,7 +243,7 @@ def run_reveal_mode(
             ttn_attr,
         )
 
-        ctrl_msg = "Ctrl+C: Copy | ESC: Return"
+        ctrl_msg = "Enter: Copy | ESC: Return"
 
         if remaining_idle <= WARNING_SECONDS:
             ctrl_msg += f" | Timeout in {int(remaining_idle)}s"
@@ -284,7 +284,7 @@ def run_reveal_mode(
             current_mode = "search"
             revealed_otps.clear()
             break
-        elif reveal_char == 3:
+        elif reveal_char in [10, 13]:
             if pyperclip_available:
                 try:
                     pyperclip.copy(otp_to_reveal_string)

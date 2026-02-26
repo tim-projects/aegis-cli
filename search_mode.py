@@ -169,26 +169,6 @@ def run_search_mode(
                 needs_redraw = True
                 continue
 
-            if char == 3:
-                if pyperclip_available and selected_row != -1 and len(display_list) > 0:
-                    try:
-                        if group_selection_mode:
-                            pass
-                        else:
-                            uuid = display_list[selected_row]["uuid"]
-                            entry = cli_backend.get_entry(uuid, vault_path, password)
-                            otp = entry.get("otp", "")
-                            if otp:
-                                pyperclip.copy(otp)
-                                status_message = "OTP copied to clipboard!"
-                            else:
-                                status_message = "Could not get OTP"
-                    except cli_backend.CLIError as e:
-                        status_message = f"Copy failed: {str(e)}"
-                elif not pyperclip_available:
-                    status_message = "Clipboard unavailable."
-                continue
-
             move_down = False
             move_up = False
 

@@ -128,16 +128,13 @@ def cli_main(stdscr, args, password):
                     start_row + box_height, start_col + 2, f"Error: {e}", RED_TEXT_COLOR
                 )
                 stdscr.refresh()
-                stdscr.nodelay(False)
-                dismiss_key = stdscr.getch()
-                stdscr.nodelay(True)
+                curses.napms(1500)
                 pwd_input = []
-                if dismiss_key == 27:
-                    return
-                continue
         elif ch in [8, 127, curses.KEY_BACKSPACE]:
             if pwd_input:
                 pwd_input.pop()
+        elif ch == curses.ERR:
+            pass
         elif 32 <= ch <= 126:
             pwd_input.append(chr(ch))
         elif ch == 27:

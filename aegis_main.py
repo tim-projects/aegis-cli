@@ -58,6 +58,7 @@ def cli_main(stdscr, args, password):
 
     row = 0
     stdscr.clear()
+    curses.curs_set(0)
 
     vault_name = os.path.basename(vault_path)
     pwd_input = []

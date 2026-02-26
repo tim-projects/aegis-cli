@@ -126,7 +126,7 @@ def cli_main(stdscr, args, password):
                 stdscr.clear()
                 stdscr.addstr(0, 0, f"Error: {e}", RED_TEXT_COLOR)
                 stdscr.refresh()
-                curses.napms(2000)
+                curses.endwin()
                 return
         elif ch in [8, 127, curses.KEY_BACKSPACE]:
             if pwd_input:

@@ -129,9 +129,11 @@ def cli_main(stdscr, args, password):
                 )
                 stdscr.refresh()
                 stdscr.nodelay(False)
-                stdscr.getch()
+                dismiss_key = stdscr.getch()
                 stdscr.nodelay(True)
                 pwd_input = []
+                if dismiss_key == 27:
+                    return
                 continue
         elif ch in [8, 127, curses.KEY_BACKSPACE]:
             if pwd_input:

@@ -6,12 +6,17 @@ import sys
 import json
 import time
 
-from aegis_core import find_vault_path, read_and_decrypt_vault_file, get_otps
+from aegis_core import find_vault_path, read_and_decrypt_vault_file, get_otps, get_ttn, get_ttn_per
 from config import load_config, save_config, DEFAULT_AEGIS_VAULT_DIR
 
 
 def format_entry_json(entry, otp_value, group_names):
     otp_str = otp_value.string() if otp_value else None
+    period = entry.info.period if entry.info and entry.info.period else 30
+    import time
+    now_ms = int(time.time() * 1000)
+    p = period * 1000
+    seconds_remaining = (p - (now_ms % p)) // 1000
     return {
         "uuid": entry.uuid,
         "name": entry.name,
@@ -20,6 +25,9 @@ def format_entry_json(entry, otp_value, group_names):
         "note": entry.note if entry.note else "",
         "otp": otp_str,
         "type": entry.type,
+        "period": period,
+        "seconds_remaining": seconds_remaining,
+        "timestamp_ms": now_ms,
     }
 
 

@@ -161,7 +161,8 @@ def run_search_mode(
                 if current_time - last_esc_time < 0.5:
                     return None
                 last_esc_time = current_time
-                status_message = "Press ESC again to exit"
+                status_message = "Press ESC again to quit"
+                needs_redraw = True
                 continue
 
             if char == ord("?"):

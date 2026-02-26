@@ -61,13 +61,14 @@ def cli_main(stdscr, args, password):
 
     vault_name = os.path.basename(vault_path)
     pwd_input = []
+    last_esc_time = 0
 
     while True:
         max_rows, max_cols = stdscr.getmaxyx()
 
         stdscr.clear()
 
-        box_height = 8
+        box_height = 9
         box_width = max(50, max_cols - 10)
         start_row = (max_rows - box_height) // 2
         start_col = (max_cols - box_width) // 2
@@ -131,7 +132,24 @@ def cli_main(stdscr, args, password):
         elif 32 <= ch <= 126:
             pwd_input.append(chr(ch))
         elif ch == 27:
-            return
+            import time
+
+            current_time = time.time()
+            if current_time - last_esc_time < 0.5:
+                return
+            last_esc_time = current_time
+            try:
+                stdscr.addstr(
+                    start_row + 6,
+                    start_col + 2,
+                    "Press ESC again to quit",
+                    NORMAL_TEXT_COLOR,
+                )
+                stdscr.refresh()
+                curses.napms(800)
+            except:
+                pass
+            continue
 
     config["last_opened_vault"] = vault_path
     config["last_vault_dir"] = os.path.dirname(vault_path)

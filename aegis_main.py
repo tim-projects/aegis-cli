@@ -131,6 +131,7 @@ def cli_main(stdscr, args, password):
                 stdscr.getch()
                 stdscr.nodelay(True)
                 pwd_input = []
+                continue
         elif ch in [8, 127, curses.KEY_BACKSPACE]:
             if pwd_input:
                 pwd_input.pop()

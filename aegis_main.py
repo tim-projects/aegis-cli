@@ -124,10 +124,12 @@ def cli_main(stdscr, args, password):
                 break
             except cli_backend.CLIError as e:
                 stdscr.addstr(
-                    max_rows - 3, start_col + 2, f"Error: {e}", RED_TEXT_COLOR
+                    start_row + box_height, start_col + 2, f"Error: {e}", RED_TEXT_COLOR
                 )
                 stdscr.refresh()
-                curses.napms(1500)
+                stdscr.nodelay(False)
+                stdscr.getch()
+                stdscr.nodelay(True)
                 pwd_input = []
         elif ch in [8, 127, curses.KEY_BACKSPACE]:
             if pwd_input:

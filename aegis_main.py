@@ -128,8 +128,11 @@ def cli_main(stdscr, args, password):
                     start_row + box_height, start_col + 2, f"Error: {e}", RED_TEXT_COLOR
                 )
                 stdscr.refresh()
-                curses.napms(1500)
-                pwd_input = []
+                stdscr.nodelay(False)
+                stdscr.getch()
+                stdscr.nodelay(True)
+                stdscr.clear()
+                return
         elif ch in [8, 127, curses.KEY_BACKSPACE]:
             if pwd_input:
                 pwd_input.pop()
@@ -281,7 +284,10 @@ def main():
     if not password:
         password = os.getenv("AEGIS_CLI_PASSWORD")
 
-    curses.wrapper(cli_main, args, password)
+    while True:
+        result = curses.wrapper(cli_main, args, password)
+        if result == "exit":
+            break
 
 
 if __name__ == "__main__":

@@ -123,10 +123,10 @@ def cli_main(stdscr, args, password):
                 entries = cli_backend.get_entries(vault_path, password)
                 break
             except cli_backend.CLIError as e:
-                stdscr.addstr(0, 0, f"Error: {e}", RED_TEXT_COLOR)
+                stdscr.addstr(0, 0, "Error: Incorrect password", RED_TEXT_COLOR)
                 stdscr.refresh()
                 curses.endwin()
-                print(f"Error: {e}")
+                print("Error: Incorrect password")
                 return
         elif ch in [8, 127, curses.KEY_BACKSPACE]:
             if pwd_input:

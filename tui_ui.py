@@ -79,8 +79,8 @@ def run_reveal_mode(
 
     last_fetch_time = entry_timestamp_ms
     last_otp = otp_to_reveal_string
-    p = period * 1000
-    seconds_remaining = (p - (entry_timestamp_ms % p)) // 1000
+
+    next_refresh_time = entry_timestamp_ms + (period * 1000)
 
     reveal_box_height = max(7, max_rows - 2)
     reveal_box_width = max(30, max_cols)
@@ -194,11 +194,11 @@ def run_reveal_mode(
             revealed_otps.clear()
             break
 
-        time_since_last_fetch = current_time_ms - last_fetch_time
         p = period * 1000
-        seconds_remaining = (p - (current_time_ms % p)) // 1000
+        seconds_remaining = (next_refresh_time - current_time_ms) // 1000
 
-        if seconds_remaining <= 2 and time_since_last_fetch > 2000:
+        if current_time_ms >= next_refresh_time:
+            next_refresh_time = current_time_ms + p
             try:
                 current_entry = cli_backend.get_entry(
                     entry_to_reveal["uuid"], vault_path, password
@@ -206,6 +206,7 @@ def run_reveal_mode(
                 new_otp_code = current_entry.get("otp", "N/A")
                 period = current_entry.get("period", 30)
                 last_fetch_time = current_entry.get("timestamp_ms", current_time_ms)
+                next_refresh_time = last_fetch_time + (period * 1000)
                 if new_otp_code != otp_to_reveal_string:
                     otp_to_reveal_string = new_otp_code
                     display_field(

@@ -3,7 +3,7 @@ import json
 import os
 import sys
 
-CLI_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aegis-cli")
+CLI_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aegis_cli.py")
 
 
 class CLIError(Exception):

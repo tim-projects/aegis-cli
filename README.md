@@ -1,6 +1,6 @@
 # aegis-tui
 
-An unoffical interactive command-line interface (CLI) tool for viewing Aegis Authenticator Time-based One-Time Passwords (TOTP).
+An unofficial interactive command-line interface for viewing Aegis Authenticator Time-based One-Time Passwords (TOTP).
 
 **Note:** This tool is primarily a viewer and does not support editing or creating new OTP codes. For that use the official app here: https://getaegis.app/
 
@@ -34,17 +34,16 @@ Time until next refresh: 25.0 seconds
 
 ## Features
 
-*   Decrypts Aegis Authenticator vault files using a provided password.
-*   Continuously displays OTP codes for all entries in a real-time refreshing table.
-*   Automatically reveals the code if only one OTP entry is displayed.
-*   Interactive mode to type-search and reveal obscured OTP codes on demand.
-*   Supports filtering OTP entries by group name.
-*   Respects terminal dimensions to prevent output overflow.
-*   Option to copy direct to the clipboard, if the clipboard app is configured in ~/.config/aegis-tui/config.json
+- Decrypts Aegis Authenticator vault files using a provided password
+- Continuously displays OTP codes in a real-time refreshing table
+- Interactive mode with type-to-search and arrow key navigation
+- Automatically reveals the code if only one OTP entry is displayed
+- Filter by group name interactively or via command line
+- Respects terminal dimensions to prevent output overflow
+- Option to copy codes directly to clipboard (configure in `~/.config/aegis-tui/config.json`)
+- Scriptable via `--json` output mode for automation
 
-## Usage
-
-### Installation (Arch Linux AUR)
+## Installation (Arch Linux AUR)
 
 To install `aegis-tui` on Arch Linux, you can use an AUR helper like `yay` or `paru`:
 
@@ -62,7 +61,7 @@ cd aegis-tui
 makepkg -si
 ```
 
-### Running the CLI
+## Usage
 
 Once installed, you can run `aegis-tui` from any terminal with the path to your Aegis vault `.json` file:
 
@@ -79,9 +78,16 @@ export AEGIS_CLI_PASSWORD="YourVaultPassword"
 aegis-tui /path/to/your/aegis-backup.json --no-color
 ```
 
+### Command Line Options
+
+- `-g, --group` - Filter OTP entries by a specific group name
+- `--json` - Output in JSON format (useful for scripting)
+- `--no-color` - Disable colored output
+- `-u, --uuid` - Display OTP for a specific entry UUID
+
 ## Configuration
 
-`aegis-tui` stores its configuration in `~/.config/aegis-tui/config.json`. This file is automatically created if it doesn't exist. It currently stores the path to the last successfully opened Aegis vault file, allowing `aegis-tui` to quickly reopen it on subsequent runs without requiring the path to be specified again. It also stores `default_color_mode`, which determines if colored output is enabled by default (true) or disabled (false). This can be overridden by the `--no-color` flag.
+`aegis-tui` stores its configuration in `~/.config/aegis-tui/config.json`. This file is automatically created if it doesn't exist. It stores the path to the last successfully opened Aegis vault file and the `default_color_mode` setting.
 
 Example `config.json`:
 

@@ -9,7 +9,7 @@ import time
 import sys
 from typing import Set, Dict, List, Any
 
-import cli_backend
+from . import cli_backend
 
 
 def display_field(

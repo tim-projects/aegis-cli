@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import argparse
 import getpass
 import os
@@ -6,14 +5,21 @@ import sys
 import json
 import time
 
-from aegis_core import find_vault_path, read_and_decrypt_vault_file, get_otps, get_ttn, get_ttn_per
-from config import load_config, save_config, DEFAULT_AEGIS_VAULT_DIR
+from .aegis_core import (
+    find_vault_path,
+    read_and_decrypt_vault_file,
+    get_otps,
+    get_ttn,
+    get_ttn_per,
+)
+from .config import load_config, save_config, DEFAULT_AEGIS_VAULT_DIR
 
 
 def format_entry_json(entry, otp_value, group_names):
     otp_str = otp_value.string() if otp_value else None
     period = entry.info.period if entry.info and entry.info.period else 30
     import time
+
     now_ms = int(time.time() * 1000)
     p = period * 1000
     seconds_remaining = (p - (now_ms % p)) // 1000
@@ -92,13 +98,7 @@ def cli_main(args):
 
         otp_value = otps.get(args.uuid)
         if args.json:
-            print(
-                json.dumps(
-                    format_entry_json(
-                        entry, otp_value, group_names
-                    )
-                )
-            )
+            print(json.dumps(format_entry_json(entry, otp_value, group_names)))
         else:
             if otp_value:
                 print(otp_value.string())
@@ -125,11 +125,7 @@ def cli_main(args):
         result = []
         for entry in entries:
             otp_value = otps.get(entry.uuid)
-            result.append(
-                format_entry_json(
-                    entry, otp_value, group_names
-                )
-            )
+            result.append(format_entry_json(entry, otp_value, group_names))
         print(json.dumps(result))
     else:
         for entry in entries:

@@ -13,12 +13,12 @@ except ImportError:
         "Warning: pyperclip library not found. OTP copying to clipboard will not be available."
     )
 
-import cli_backend
-from tui_ui import run_reveal_mode
-from config import load_config, save_config, DEFAULT_AEGIS_VAULT_DIR
-from search_mode import run_search_mode
-from tui_utils import init_colors
-from aegis_core import find_vault_path
+from . import cli_backend
+from .tui_ui import run_reveal_mode
+from .config import load_config, save_config, DEFAULT_AEGIS_VAULT_DIR
+from .search_mode import run_search_mode
+from .tui_utils import init_colors
+from .aegis_core import find_vault_path
 
 
 def cli_main(stdscr, args, password):

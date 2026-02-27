@@ -10,7 +10,7 @@ PASSWORD = "testvault123!"
 
 
 def run_cli(args):
-    cmd = ["./aegis-cli", "-p", PASSWORD, VAULT] + args
+    cmd = [sys.executable, "-m", "aegis_tui.aegis_cli", "-p", PASSWORD, VAULT] + args
     result = subprocess.run(cmd, capture_output=True, text=True)
     return result
 
@@ -77,7 +77,9 @@ def test_group_filter_json():
 def test_invalid_password():
     """Test invalid password"""
     result = subprocess.run(
-        ["./aegis-cli", "-p", "wrongpassword", VAULT], capture_output=True, text=True
+        [sys.executable, "-m", "aegis_tui.aegis_cli", "-p", "wrongpassword", VAULT],
+        capture_output=True,
+        text=True,
     )
     assert result.returncode == 1, "Should fail with wrong password"
     print("PASS: invalid password")

@@ -5,9 +5,9 @@ try:
 except ImportError:
     pass
 
-import cli_backend
-from tui_display import draw_main_screen
-from help_mode import run_help_mode
+from . import cli_backend
+from .tui_display import draw_main_screen
+from .help_mode import run_help_mode
 
 
 def run_search_mode(

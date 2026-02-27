@@ -142,7 +142,16 @@ def cli_main(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Aegis Authenticator CLI in Python.", prog="aegis-cli"
+        description="Aegis Authenticator CLI - view OTP codes from your Aegis vault",
+        prog="aegis-cli",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+  aegis-cli                      # Use last vault or search in current dir
+  aegis-cli vault.json          # Specify vault file
+  aegis-cli -g Finance          # Filter by group
+  aegis-cli -u <uuid>           # Show specific entry
+  aegis-cli --json              # JSON output for scripting
+  AEGIS_CLI_PASSWORD=pass aegis-cli vault.json  # Non-interactive""",
     )
     parser.add_argument(
         "vault_path", nargs="?", help="Path to the Aegis vault file.", default=None

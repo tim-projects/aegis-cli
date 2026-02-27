@@ -254,7 +254,14 @@ def cli_main(stdscr, args, password):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Aegis Authenticator TUI.", prog="aegis-tui"
+        description="Aegis Authenticator TUI - interactive OTP code viewer",
+        prog="aegis-tui",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+  aegis-tui                      # Use last vault or search in current dir
+  aegis-tui vault.json          # Specify vault file
+  aegis-tui -g Finance          # Filter by group
+  aegis-tui --no-color          # Disable colors""",
     )
     parser.add_argument(
         "vault_path", nargs="?", help="Path to the Aegis vault file.", default=None
